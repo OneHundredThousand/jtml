@@ -1,71 +1,148 @@
 (function () {
-  
+  const XMethodToHttpMethod = {
+    'x-get': 'GET',
+    'x-post': 'POST',
+    'x-put': 'PUT',
+  }
+
   function processJtmlElements() {
-    const getElements = document.querySelectorAll("[x-get]");
+    const elements = document.querySelectorAll('[x-get], [x-post], [x-put]');
 
-    getElements.forEach(async el => {
-      const url = el.getAttribute("x-get");
-      const targetSelector = el.getAttribute("x-target");
-      const template = el.querySelector("template");
+    elements.forEach(async (el) => {
+      const method = getHttpMethod(el); // GET / POST / PUT
 
-      if (!template) {
-        console.warn("No <template> found inside:", el);
-        return;
+      switch (method) {
+        case 'GET':
+          await attachGetRequest(el);
+          break;
+        case 'POST':
+          await attachPostRequest(el);
+          break;
+        case 'PUT':
+          await attachPutRequest(el);
+          break;
+        default:
+          console.warn('[jtml] Unknown method for element:', el);
       }
+    });
+  }
 
-      let data;
-      try {
-        const testDataAttr = el.getAttribute('x-test-data');
-        if (testDataAttr) {
-          try {
-            data = JSON.parse(testDataAttr);
-            console.info('[jtml] Using x-test-data instead of x-get:', data);
-          } catch (err) {
-            console.error('[jtml] Failed to parse x-test-data JSON:', err);
-            return;
-          }
-        } else {
-          // Fallback: fetch from x-get URL
-          const url = el.getAttribute('x-get');
-          if (!url) return;
-          try {
-            const res = await fetch(url);
-            data = await res.json();
-          } catch (err) {
-            console.error('[jtml] Failed to fetch x-get URL:', url, err);
-            return;
-          }
-        }
-      } catch (e) {
-        console.error("Failed to fetch:", url, e);
-        return;
-      }
+  function getHttpMethod(el) {
+    if (el.hasAttribute('x-get')) {
+      return 'GET';
+    }
+    if (el.hasAttribute('x-post')) {
+      return 'POST';
+    }
+    if (el.hasAttribute('x-put')) {
+      return 'PUT';
+    }
+    return null;
+  }
 
-      const target = targetSelector
-        ? document.querySelector(targetSelector)
-        : el;
+  async function attachGetRequest(el) {
+    let data;
 
-      // Clear previous content if not appending
-      if (!targetSelector) {
-        target.innerHTML = "";
-      }
+    const testData = el.getAttribute('x-test-data');
+    if (testData) {
+      data = getTestData(el)
+    } else {
+      data = fetchJSON(el, 'x-get')
+    }
 
-      data.forEach(item => {
-        const clone = template.content.cloneNode(true);
+    renderTemplate(el, data);
+  }
 
-        clone.querySelectorAll("[x-foreach]").forEach(loopEl => {
-          loopEl.removeAttribute("x-foreach");
-        });
+  function getTestData(el) {
+    const testData = el.getAttribute('x-test-data');
+    if (!testData) {
+      return;
+    }
 
-        // Replace x-text bindings
-        clone.querySelectorAll("[x-text]").forEach(textEl => {
-          const path = textEl.getAttribute("x-text"); // e.g. "res.name"
-          const value = getNestedValue(item, path);
-          textEl.textContent = value;
-        });
+    try {
+      const data = JSON.parse(testData);
+      console.info('[jtml] Using x-test-data');
+      return data;
+    } catch (e) {
+      console.error('[jtml] Invalid x-test-data:', e);
+      return;
+    }
+  }
 
-        target.appendChild(clone);
+  async function fetchJSON(el, name) {
+    const url = el.getAttribute(name);
+    const method = XMethodToHttpMethod[name];
+    try {
+      const res = await fetch({
+        url,
+        method,
       });
+      data = await res.json();
+    } catch (err) {
+      console.error('[jtml] fetch failed:', url, err);
+      return;
+    }
+  }
+
+  async function attachPostRequest(el) {
+    console.warn('[x-post] not yet implemented')
+  }
+
+  async function attachPutRequest(el) {
+    console.warn('[x-put] not yet implemented')
+  }
+
+  function renderTemplate(container, response) {
+    const template = container.querySelector("template");
+    if (!template) {
+      return;
+    }
+
+    const target = container.hasAttribute("x-target")
+      ? document.querySelector(container.getAttribute("x-target"))
+      : container;
+
+    const content = template.content.cloneNode(true);
+    target.innerHTML = "";
+
+    processForeachBlocks(content, response, target);
+    applyTextBindings(content, response);
+
+    target.appendChild(content);
+  }
+
+  function processForeachBlocks(content, response, target) {
+    const foreachBlocks = content.querySelectorAll("[x-foreach]");
+    foreachBlocks.forEach(loopEl => {
+      const path = loopEl.getAttribute("x-foreach");
+      const loopData = path ? getNestedValue(response, path) : response;
+
+      if (!Array.isArray(loopData)) {
+        console.warn("x-foreach expected an array but got", loopData);
+        return;
+      }
+
+      const cloneContainer = document.createDocumentFragment();
+
+      loopData.forEach(item => {
+        const inner = loopEl.cloneNode(true);
+        applyTextBindings(inner, item);
+        cloneContainer.appendChild(inner);
+      });
+
+      // Replace loopEl with its clones, not append to target directly
+      loopEl.replaceWith(cloneContainer);
+    });
+  }
+
+  function applyTextBindings(fragment, data) {
+    if (!fragment.querySelectorAll) return;
+
+    fragment.querySelectorAll("[x-text]").forEach(el => {
+      const path = el.getAttribute("x-text");
+      const value = getNestedValue(data, path);
+      el.removeAttribute("x-text")
+      el.innerHTML = value;
     });
   }
 

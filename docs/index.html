@@ -19,11 +19,16 @@
   <form id="playground-form">
     <textarea id="code" name="code" rows="10" cols="80">
   <!-- Type your jtml here -->
-  <div x-get="/posts" x-test-data='[{"name":"Art"},{"name":"Bea"}]'>
+  <div x-get="/posts" x-test-data='{ "data": [{"name":"John", "age": 40},{"name":"Doe", "age": 40}], "pages": 1 }'>
     <template>
-      <div x-foreach>
-        <span x-text="name"></span>
+      <div x-foreach="data">
+          <span x-text="name"></span>
+          <span x-text="age"></span>
       </div>
+      <div>
+        Pages: <span x-text="pages"></span>
+      </div>
+      <p>static text</p>
     </template>
   </div>
     </textarea>
