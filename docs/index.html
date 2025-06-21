@@ -1,0 +1,32 @@
+<!-- docs/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>jtml Playground</title>
+  <script src="../jtml.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    .card { padding: 0.5rem; margin: 0.5rem 0; background: #f2f2f2; border-radius: 4px; }
+    code { background: #eee; padding: 0.2rem; }
+  </style>
+</head>
+<body>
+
+  <h1>🎮 jtml Playground</h1>
+  <p>This is a live example using <code>x-get</code> and <code>x-test-data</code>.</p>
+
+  <div x-get="/posts" x-test-data='[{"name":"Art"},{"name":"Bea"}]'>
+    <template>
+      <div x-foreach>
+        <div class="card">
+          <span x-text="name"></span>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <p style="font-size: 0.8rem; color: #888;">Try editing the <code>x-test-data</code> inline in the HTML!</p>
+
+</body>
+</html>

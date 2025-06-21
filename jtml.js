@@ -15,8 +15,27 @@
 
       let data;
       try {
-        const response = await fetch(url);
-        data = await response.json();
+        const testDataAttr = container.getAttribute('x-test-data');
+        if (testDataAttr) {
+          try {
+            data = JSON.parse(testDataAttr);
+            console.info('[jtml] Using x-test-data instead of x-get:', data);
+          } catch (err) {
+            console.error('[jtml] Failed to parse x-test-data JSON:', err);
+            return;
+          }
+        } else {
+          // Fallback: fetch from x-get URL
+          const url = container.getAttribute('x-get');
+          if (!url) return;
+          try {
+            const res = await fetch(url);
+            data = await res.json();
+          } catch (err) {
+            console.error('[jtml] Failed to fetch x-get URL:', url, err);
+            return;
+          }
+        }
       } catch (e) {
         console.error("Failed to fetch:", url, e);
         return;
@@ -40,8 +59,8 @@
 
         // Replace x-text bindings
         clone.querySelectorAll("[x-text]").forEach(textEl => {
-          const expr = textEl.getAttribute("x-text"); // e.g. "res.name"
-          const value = resolveExpression(expr, item);
+          const path = textEl.getAttribute("x-text"); // e.g. "res.name"
+          const value = getNestedValue(item, path);
           textEl.textContent = value;
         });
 
@@ -50,14 +69,8 @@
     });
   }
 
-  function resolveExpression(expr, context) {
-    try {
-      // Very basic and slightly dangerous eval (can be improved)
-      return Function("res", `return ${expr}`)(context);
-    } catch (e) {
-      console.warn("Failed to evaluate expression:", expr, e);
-      return "";
-    }
+  function getNestedValue(obj, path) {
+    return path.split('.').reduce((o, key) => (o ? o[key] : undefined), obj);
   }
 
   if (document.readyState !== "loading") {
