@@ -1,57 +1,30 @@
 (function () {
-  const XMethodToHttpMethod = {
+  const XMethodMap = {
     'x-get': 'GET',
     'x-post': 'POST',
     'x-put': 'PUT',
-  }
+  };
 
   function processJtmlElements() {
-    const elements = document.querySelectorAll('[x-get], [x-post], [x-put]');
-
-    elements.forEach(async (el) => {
-      const method = getHttpMethod(el); // GET / POST / PUT
-
-      switch (method) {
-        case 'GET':
-          await attachGetRequest(el);
-          break;
-        case 'POST':
-          await attachPostRequest(el);
-          break;
-        case 'PUT':
-          await attachPutRequest(el);
-          break;
-        default:
-          console.warn('[jtml] Unknown method for element:', el);
-      }
+    Object.keys(XMethodMap).forEach(attrName => {
+      document.querySelectorAll(`[${attrName}]`).forEach(el => {
+        attachRequest(el, attrName);
+      });
     });
   }
 
-  function getHttpMethod(el) {
-    if (el.hasAttribute('x-get')) {
-      return 'GET';
-    }
-    if (el.hasAttribute('x-post')) {
-      return 'POST';
-    }
-    if (el.hasAttribute('x-put')) {
-      return 'PUT';
-    }
-    return null;
-  }
-
-  async function attachGetRequest(el) {
-    let data;
+  async function attachRequest(el, attrName) {
+    const method = XMethodMap[attrName];
+    if (!method) return;
 
     const testData = el.getAttribute('x-test-data');
-    if (testData) {
-      data = getTestData(el)
-    } else {
-      data = fetchJSON(el, 'x-get')
-    }
+    let data = testData ? getTestData(el) : await fetchJSON(el, attrName);
 
-    renderTemplate(el, data);
+    if (data) {
+      renderTemplate(el, data);
+    }
   }
+
 
   function getTestData(el) {
     const testData = el.getAttribute('x-test-data');
@@ -73,23 +46,12 @@
     const url = el.getAttribute(name);
     const method = XMethodToHttpMethod[name];
     try {
-      const res = await fetch({
-        url,
-        method,
-      });
-      data = await res.json();
+      const res = await fetch(url, { method });
+      return res.json();
     } catch (err) {
       console.error('[jtml] fetch failed:', url, err);
       return;
     }
-  }
-
-  async function attachPostRequest(el) {
-    console.warn('[x-post] not yet implemented')
-  }
-
-  async function attachPutRequest(el) {
-    console.warn('[x-put] not yet implemented')
   }
 
   function renderTemplate(container, response) {
