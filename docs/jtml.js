@@ -15,7 +15,7 @@
 
       let data;
       try {
-        const testDataAttr = container.getAttribute('x-test-data');
+        const testDataAttr = el.getAttribute('x-test-data');
         if (testDataAttr) {
           try {
             data = JSON.parse(testDataAttr);
@@ -26,7 +26,7 @@
           }
         } else {
           // Fallback: fetch from x-get URL
-          const url = container.getAttribute('x-get');
+          const url = el.getAttribute('x-get');
           if (!url) return;
           try {
             const res = await fetch(url);
