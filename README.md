@@ -42,13 +42,16 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
 ```html
 <div x-get="/posts">
   <template>
-    <div x-foreach="res">
-      <span x-text="res.name"></span>
+    <div x-foreach>
+      <span x-text="name"></span>
     </div>
   </template>
 </div>
+<!-- /post return [{ "name": "name" }] -->
 ```
 
+## 🎮 Playground
+[🧪 Try it in the Playground!](https://onehundredthousand.github.io/jtml/)
 
 ## 🔧 How It Works
 
@@ -87,11 +90,38 @@ This project is a collaboration between human creativity and OpenAI’s ChatGPT.
 
 ## 🛠️ Roadmap
 
-- [ ] Add support for `x-if`, `x-class`, `x-on:event`
-- [ ] Enhanced error/loading templates
-- [ ] Support for `x-foreach="item in res"` syntax
-- [ ] Partial updates via `x-patch`, `x-post`
-- [ ] Component-style nesting?
+Here are the current goals and ideas being considered for jtml's development. The aim is to keep the library small and focused while supporting common, essential frontend needs.
+
+### ✅ Core Goals (High Priority)
+
+- [x] **Support for `GET` Method**
+  - Fetch JSON from a given URL via `x-get` and render it using a template
+- [x] **Static Test Data Support**
+  - Allow using `x-test-data='[...]'` to simulate API responses for rapid prototyping
+- [ ] **Support for `POST`, `PUT`, `PATCH`, `DELETE`,  Methods**
+  - Extend current behavior to handle `x-post`, `x-put`, `x-patch` and `x-delete` for sending and receiving JSON data
+- [ ] **Error Handling**
+  - Provide a declarative way to display error HTML when a fetch fails (e.g. using `<div x-error>` or `x-error-template`)
+- [ ] **Custom Headers**
+  - Allow optional request headers for things like Authorization via a JSON attribute (e.g. `x-headers='{"Authorization": "Bearer ..."}'`)
+- [ ] **`x-target` Attribute**
+  - Allow content to be rendered into a separate target container rather than in-place
+
+### 🎁 Bonus Ideas (Future Exploration)
+
+- [ ] **SPA-like Navigation**
+  - Add support for progressive enhancement of internal links (similar to `hx-boost`) to enable basic SPA behavior via HTML streaming or swaps
+- [ ] **Server-Sent Events (SSE) Support**
+  - Enable live updates using SSE with `x-sse="/events"`
+- [ ] **WebSocket Support**
+  - Possible integration for real-time templates rendered from incoming WebSocket messages
+
+---
+
+The focus will always be on minimalism and doing one thing well—putting HTML-driven templating at the center of frontend development.
+
+
+The focus will always be on minimalism and doing one thing well—putting HTML-driven templating at the center of frontend development.
 
 ---
 
