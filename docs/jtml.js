@@ -20,7 +20,7 @@
             return;
           }
 
-          triggerEl.addEventListener("click", handler);
+          triggerEl.addEventListener(event, handler);
         } else {
           // No custom trigger, fire immediately
           handler();
