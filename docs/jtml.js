@@ -4,18 +4,39 @@
     'x-post': 'POST',
     'x-put': 'PUT',
   };
+  const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
 
   function processJtmlElements() {
     Object.keys(XMethodMap).forEach(attrName => {
       document.querySelectorAll(`[${attrName}]`).forEach(el => {
-        attachRequest(el, attrName);
+        const event = getEventTrigger(el);
+        if (event) {
+          el.addEventListener(event, () => attachRequest(el, attrName));
+        } else {
+          // No custom trigger, fire immediately
+          attachRequest(el, attrName);
+        }
       });
     });
   }
 
+  function getEventTrigger(el) {
+    for (const attr of el.attributes) {
+      if (attr.name.startsWith("x-")) {
+        const event = attr.name.slice(2); // e.g. "click"
+        if (SupportedEvents.includes(event)) {
+          return event;
+        }
+      }
+    }
+    return null;
+  }
+
   async function attachRequest(el, attrName) {
     const method = XMethodMap[attrName];
-    if (!method) return;
+    if (!method) {
+      return;
+    }
 
     const testData = el.getAttribute('x-test-data');
     let data = testData ? getTestData(el) : await fetchJSON(el, attrName);
@@ -60,17 +81,25 @@
       return;
     }
 
-    const target = container.hasAttribute("x-target")
-      ? document.querySelector(container.getAttribute("x-target"))
+    // Determine the target for output
+    const targetSelector = container.getAttribute("x-target");
+    const target = targetSelector
+      ? container.querySelector(targetSelector)
       : container;
+
+    if (targetSelector && !target) {
+      console.warn(
+        "[jtml] Target not found inside scoped container:",
+        targetSelector
+      );
+      return;
+    }
 
     const content = template.content.cloneNode(true);
     target.innerHTML = "";
 
     processForeachBlocks(content, response, target);
     applyTextBindings(content, response);
-
-    target.appendChild(content);
   }
 
   function processForeachBlocks(content, response, target) {
@@ -95,15 +124,18 @@
       // Replace loopEl with its clones, not append to target directly
       loopEl.replaceWith(cloneContainer);
     });
+    target.appendChild(content);
   }
 
   function applyTextBindings(fragment, data) {
-    if (!fragment.querySelectorAll) return;
+    if (!fragment.querySelectorAll) {
+      return;
+    }
 
     fragment.querySelectorAll("[x-text]").forEach(el => {
       const path = el.getAttribute("x-text");
       const value = getNestedValue(data, path);
-      el.removeAttribute("x-text")
+      el.removeAttribute("x-text");
       el.innerHTML = value;
     });
   }
