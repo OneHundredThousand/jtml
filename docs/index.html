@@ -75,7 +75,6 @@
     }
 
     function renderPreview(html) {
-      console.log(html)
       playgroundOutput.innerHTML = html;
       jtml.render(playgroundOutput); // ← run your library
     }
@@ -83,7 +82,6 @@
     runBtn.addEventListener("click", (e) => {
       e.preventDefault();
       const html = textarea.value;
-      console.log(html)
       renderPreview(html);
     });
 
