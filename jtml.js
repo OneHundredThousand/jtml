@@ -3,6 +3,7 @@
     'x-get': 'GET',
     'x-post': 'POST',
     'x-put': 'PUT',
+    'x-patch': 'PATCH',
   };
   const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
   const builtinActions = {
@@ -97,8 +98,20 @@
   async function fetchData(el, name) {
     const url = el.getAttribute(name);
     const method = XMethodMap[name];
+
+    const options = {
+      method,
+      headers: {}
+    };
+    const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
+    if (isWriteMethod) {
+      const body = extractRequestBody(el);
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+
     try {
-      const res = await fetch(url, { method });
+      const res = await fetch(url, options);
 
       if (el.hasAttribute("x-html")) {
         return res.text();  // Get raw HTML string
@@ -186,6 +199,19 @@
         }
       });
     });
+  }
+
+  function extractRequestBody(el) {
+    if (el.tagName === "FORM") {
+      const formData = new FormData(el);
+      const obj = {};
+      for (const [key, value] of formData.entries()) {
+        obj[key] = value;
+      }
+      return obj;
+    }
+
+    return {}; // default if it's not a form
   }
 
   function getNestedValue(obj, path) {
