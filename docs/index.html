@@ -71,7 +71,6 @@
     if (params.has("code")) {
       const code = decodeURIComponent(params.get("code"));
       textarea.value = code;
-      renderPreview(code);
     }
 
     function renderPreview(html) {
@@ -92,8 +91,6 @@
       const newUrl = `${window.location.pathname}?code=${encoded}`;
       history.replaceState(null, "", newUrl);
     });
-
-    console.log(jtml)
   </script>
 </body>
 
