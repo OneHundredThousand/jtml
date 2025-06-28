@@ -6,6 +6,12 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
 
 > jtml stands for **JSON Template Markup Language**. It's like HTML... but powered by JSON.
 
+![License](https://img.shields.io/badge/license-MIT-green)
+![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+![Last Commit](https://img.shields.io/github/last-commit/YOUR_USER/YOUR_REPO)
+![Inspired by HTMX](https://img.shields.io/badge/Inspired%20by-HTMX-blue)
+![Inspired by Alpine.js](https://img.shields.io/badge/Inspired%20by-Alpine.js-77C1D2)
+
 ## 🌿 jtml Manifesto
 
 ```text
@@ -78,7 +84,7 @@ Modern frontend stacks have overcomplicated the simple act of rendering data. `j
 - Minimal JavaScript overhead  
 - Transparent design and layout logic  
 
-Inspired by **HTMX** and the joy of declarative UI, `jtml` embraces simplicity and clarity for building dynamic web interfaces.
+Inspired by HTMX, the joy of declarative UI, and the lightweight interactivity of Alpine.js, jtml embraces simplicity and clarity for building dynamic web interfaces — all without handing over the keys to a massive JS framework.
 
 ---
 
@@ -148,20 +154,34 @@ This project is a collaboration between human creativity and OpenAI’s ChatGPT.
 
 Here are the current goals and ideas being considered for jtml's development. The aim is to keep the library small and focused while supporting common, essential frontend needs.
 
-### ✅ Core Goals (High Priority)
+## 🎯 Core Goals
 
-- [x] **Support for `GET` Method**
-  - Fetch JSON from a given URL via `x-get` and render it using a template
-- [x] **Static Test Data Support**
-  - Allow using `x-test-data='[...]'` to simulate API responses for rapid prototyping
-- [ ] **Support for `POST`, `PUT`, `PATCH`, `DELETE`,  Methods**
-  - Extend current behavior to handle `x-post`, `x-put`, `x-patch` and `x-delete` for sending and receiving JSON data
-- [ ] **Error Handling**
-  - Provide a declarative way to display error HTML when a fetch fails (e.g. using `<div x-error>` or `x-error-template`)
-- [ ] **Custom Headers**
-  - Allow optional request headers for things like Authorization via a JSON attribute (e.g. `x-headers='{"Authorization": "Bearer ..."}'`)
-- [ ] **`x-target` Attribute**
-  - Allow content to be rendered into a separate target container rather than in-place
+`jtml` is built around progressive enhancement, keeping things declarative, and doing more with less. Here's what we're focused on (and what we've nailed so far):
+
+- [x] **Support for `GET` requests**  
+  Fetch JSON from a given URL using `x-get` and render it through a local `<template>`. This is the foundation.
+
+- [x] **Static Test Data**  
+  Use `x-test-data='[...]'` to prototype without needing an actual backend. Great for design-first workflows and quick mocks.
+
+- [x] **Scoped Targets (`x-target`)**  
+  Render responses into a different part of the DOM — not just in-place. Perfect for modals, sidebars, or sneakily updating that one notification bell.
+
+- [x] **Lifecycle Hooks**  
+  Run custom JS before or after requests with attributes like `x-before`, `x-after`, and `x-error`. Lightweight control without the mess.
+
+- [x] **Attribute-Based Templates**  
+  Define templates inline using `x-template`, so you can keep logic and layout close — no extra files or imports needed.
+
+- [x] **Event Triggering**  
+  Automatically dispatch custom events (like `jtml:loaded`, `jtml:error`, etc.) after key actions, so other scripts can react without tight coupling.
+
+- [x] **Support for `POST`, `PUT`, `PATCH`, `DELETE`**  
+  Extend current behavior to handle `x-post`, `x-put`, `x-patch`, and `x-delete` for sending and receiving JSON.
+
+- [x] **Error Handling UI**  
+  Show fallback/error HTML when a request fails — ideally using something like `<div x-error>` or a dedicated `x-error-template`.
+
 
 ### 🎁 Bonus Ideas (Future Exploration)
 

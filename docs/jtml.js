@@ -4,11 +4,11 @@
     'x-post': 'POST',
     'x-put': 'PUT',
     'x-patch': 'PATCH',
+    'x-delete': 'DELETE',
   };
   const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
-  const builtinActions = {
-    paginate: builtinPaginate
-  };
+  const actions = {}
+  const _globalActions = [];
 
   function processJtmlElements(elem) {
     Object.keys(XMethodMap).forEach(attrName => {
@@ -30,6 +30,9 @@
           handler();
         }
       });
+    });
+    document.querySelectorAll("[x-loading], [x-error]").forEach(el => {
+      el.style.display = "none";
     });
   }
 
@@ -68,16 +71,24 @@
       return;
     }
 
-    if (el.hasAttribute("x-html")) {
-      target.innerHTML = data;
-      processJtmlElements(target);
-    } else {
-      renderTemplate(el, data, target);
-      runBuiltinActions(el);
-      runCustomActions(el);
+    showLoading(el);
+    hideError(el);
+    try {
+      if (el.hasAttribute("x-html")) {
+        target.innerHTML = data;
+        processJtmlElements(target);
+      } else {
+        renderTemplate(el, data, target);
+        applyActions(el, "post");
+      }
+    } catch (err) {
+      console.error("[jtml] fetch failed:", err);
+      showError(el, err);
+    } finally {
+      hideLoading(el);
     }
   }
-
+  var e = 0;
 
   function getTestData(el) {
     const testData = el.getAttribute('x-test-data');
@@ -98,10 +109,11 @@
   async function fetchData(el, name) {
     const url = el.getAttribute(name);
     const method = XMethodMap[name];
+    const customOptions = applyActions(el, "pre");
 
     const options = {
       method,
-      headers: {}
+      headers: customOptions.headers,
     };
     const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
     if (isWriteMethod) {
@@ -201,6 +213,37 @@
     });
   }
 
+  function showLoading(el) {
+    const loadingEl = el.querySelector("[x-loading]");
+    if (loadingEl) {
+      loadingEl.style.display = "";
+    }
+  }
+
+  function hideLoading(el) {
+    const loadingEl = el.querySelector("[x-loading]");
+    if (loadingEl) {
+      loadingEl.style.display = "none";
+    }
+  }
+
+  function showError(el, errorData) {
+    const errorEl = el.querySelector("[x-error]");
+    if (!errorEl) {
+      return;
+    }
+
+    applyTextBindings(el, errorData || {});
+    errorEl.style.display = "";
+  }
+
+  function hideError(el) {
+    const errorEl = el.querySelector("[x-error]");
+    if (errorEl) {
+      errorEl.style.display = "none";
+    }
+  }
+
   function extractRequestBody(el) {
     if (el.tagName === "FORM") {
       const formData = new FormData(el);
@@ -235,26 +278,37 @@
     el.setAttribute("x-get", newUrl);
   }
 
-  function runBuiltinActions(el) {
-    if (el.hasAttribute("x-paginate")) {
-      builtinActions.paginate(el);
-    }
-  }
+  function applyActions(el, phase, response = null) {
+    const actionAttrs = Array.from(el.attributes).filter(attr =>
+      attr.name.startsWith("x-action-")
+    );
 
-  function runCustomActions(el) {
-    if (!window.jtml || !window.jtml.actions) return;
+    const options = {}
 
-    for (const attr of el.attributes) {
-      if (attr.name.startsWith("x-action-")) {
-        const fnName = attr.name.slice("x-action-".length);
-        const fn = window.jtml.actions[fnName];
-        if (typeof fn === "function") {
-          fn(el);
-        } else {
-          console.warn(`[jtml] Unknown x-action '${fnName}'`);
-        }
+    for (const attr of actionAttrs) {
+      const name = attr.name.replace("x-action-", "");
+      const action = actions[name];
+
+      if (typeof action !== "object") continue;
+
+      if (phase === "pre" && typeof action.pre === "function") {
+        action.pre(el, options);
+      } else if (phase === "post" && typeof action.post === "function") {
+        action.post(el, response, options);
       }
     }
+
+    if (phase === "pre") {
+      _globalActions.forEach(fn => {
+        if (typeof fn.pre === "function") fn.pre(el, options);
+      });
+    } else if (phase === "post") {
+      _globalActions.forEach(fn => {
+        if (typeof fn.post === "function") fn.post(el, response, options);
+      });
+    }
+
+    return options;
   }
 
   if (document.readyState !== "loading") {
@@ -263,7 +317,21 @@
     document.addEventListener("DOMContentLoaded", () => processJtmlElements(document.body));
   }
 
+  function registerAction(name, fn) {
+    actions[name] = fn;
+  }
+
+  registerAction("paginate", {
+    post: builtinPaginate,
+  });
+
   window.jtml = {
     render: processJtmlElements,
+    addGlobalAction: (fn) => {
+      if (typeof fn === "function") {
+        _globalActions.push(fn);
+      }
+    },
+    registerAction,
   }
 })();
