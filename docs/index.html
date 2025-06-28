@@ -62,7 +62,7 @@
     <ul>
         <li><a href="./event-triggers.html">Event Triggers</a></li>
         <li><a href="./x-target.html">Scoped Targets (<code>x-target</code>)</a></li>
-        <li><a href="./x-scope.html">Using <code>x-scope</code></a></li>
+        <li><a href="./x-scoped.html">Using <code>x-scoped</code></a></li>
         <li><a href="./hooks.html">Lifecycle Hooks (<code>x-before</code>, <code>x-after</code>)</a></li>
     </ul>
 
@@ -76,9 +76,13 @@
 
     <hr />
     <p>
-        Want to experiment live? Head over to the <a href="/playground.html">jtml Playground →</a>
+        Want to experiment live? Head over to the <a id="go-to-playground" href="/playground.html">jtml Playground →</a>
     </p>
 
+    <script>
+        const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
+        document.getElementById('go-to-playground').href = `${base}/playground.html`;
+    </script>
 </body>
 
 </html>

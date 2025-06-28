@@ -27,6 +27,16 @@
             margin-bottom: 0.5rem;
         }
 
+        .back {
+            margin-bottom: 2rem;
+        }
+
+        .back>a {
+            text-decoration: none;
+            color: #0077cc;
+            font-weight: bold;
+        }
+
         .demo {
             border: 1px solid #ddd;
             padding: 1rem;
@@ -43,6 +53,12 @@
 </head>
 
 <body>
+
+    <div class="back">
+        <a href="/">
+            ← Back to Examples
+        </a>
+    </div>
 
     <h1>GET JSON (Simple Object)</h1>
     <p>
@@ -115,6 +131,8 @@
         const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
         const code = document.getElementById("example");
         const toPlayground = document.getElementById("go-to-playground");
+
+        document.querySelector('.back>a').href = base || '/';
 
         toPlayground.addEventListener('click', (e) => {
             e.preventDefault();

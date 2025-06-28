@@ -13,7 +13,10 @@
   function processJtmlElements(elem) {
     Object.keys(XMethodMap).forEach(attrName => {
       elem.querySelectorAll(`[${attrName}]`).forEach(el => {
-        const handler = () => attachRequest(el, attrName);
+        const handler = (e) => {
+          e.preventDefault();
+          attachRequest(el, attrName);
+        };
         const event = getEventTrigger(el);
         if (event) {
           const triggerSelector = el.getAttribute(`x-${event}`)
