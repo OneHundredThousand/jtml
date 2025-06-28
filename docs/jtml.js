@@ -14,7 +14,7 @@
     Object.keys(XMethodMap).forEach(attrName => {
       elem.querySelectorAll(`[${attrName}]`).forEach(el => {
         const handler = (e) => {
-          e.preventDefault();
+          e?.preventDefault();
           attachRequest(el, attrName);
         };
         const event = getEventTrigger(el);
