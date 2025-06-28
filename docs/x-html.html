@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>GET JSON (Simple Object) - jtml Example</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1em;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: monospace;
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .demo {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            background: #fcfcfc;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .tip {
+            background: #f5faff;
+            border-left: 4px solid #2196F3;
+            padding: 1em;
+            margin: 1.5em 0;
+        }
+
+        .warning {
+            border-left: 4px solid #ffa500;
+            background: #fffbe6;
+            padding: 1em;
+            margin: 1.5em 0;
+        }
+    </style>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+    <!-- Include language components you need -->
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+</head>
+
+<body>
+
+    <h1>Rendering Raw HTML with <code>x-html</code></h1>
+    <p>
+        Sometimes, the data you receive from an API isn’t just plain text — it’s full-on HTML.
+    </p>
+    <p>
+        That’s where <code>x-html</code> comes in. It lets you <strong>inject raw HTML</strong> directly into your
+        elements.
+        Unlike <code>x-text</code>, which sets <code>textContent</code>, <code>x-html</code> sets
+        <code>innerHTML</code>, rendering the markup as real DOM elements.
+    </p>
+
+    <div class="warning">
+        <strong>🚧 Heads-up!</strong>
+        <p style="margin: 0.5em 0 0 0;">
+            Use <code>x-html</code> only when you <strong>trust</strong> the content. Rendering unescaped HTML from
+            unknown sources can expose your page to <abbr title="Cross-Site Scripting">XSS</abbr> vulnerabilities.
+        </p>
+    </div>
+
+    <h2>🧾 Sample API Response</h2>
+    <pre><code class="language-html">
+&lt;h2&gt;Welcome back, Alice!&lt;/h2&gt;
+&lt;p&gt;You have &lt;strong&gt;3 unread messages&lt;/strong&gt;.&lt;/p&gt;
+    </code></pre>
+
+    <h2>Code Example</h2>
+    <pre><code id="example" class="language-html">
+&lt;div x-get="raw.html" x-html&gt;
+&lt;/div&gt;
+    </code></pre>
+
+    <h2>Result</h2>
+
+    <div class="demo">
+        <div x-get="raw.html" x-html>
+        </div>
+    </div>
+
+    <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
+
+    <script src="jtml.js"></script>
+    <script>
+        const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
+        const code = document.getElementById("example");
+        const toPlayground = document.getElementById("go-to-playground");
+
+        // workaround for github pages
+        code.textContent = code.textContent.replace('raw.html', `${base}/raw.html`);
+        document.querySelector('.demo > div').setAttribute('x-get', `${base}/raw.html`);
+
+        toPlayground.addEventListener('click', (e) => {
+            e.preventDefault();
+            const html = code.textContent;
+            const encoded = encodeURIComponent(html);
+            const newUrl = `${base}/playground.html?code=${encoded}`;
+            window.location.href = newUrl;
+        })
+
+    </script>
+</body>
+
+</html>

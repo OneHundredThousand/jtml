@@ -1,97 +1,84 @@
-<!-- docs/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <title>jtml Playground</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 1rem;
-    }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>jtml Examples</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
+        }
 
-    .card {
-      padding: 0.5rem;
-      margin: 0.5rem 0;
-      background: #f2f2f2;
-      border-radius: 4px;
-    }
+        h1 {
+            margin-bottom: 0.25em;
+        }
 
-    code {
-      background: #eee;
-      padding: 0.2rem;
-    }
-  </style>
+        h2 {
+            margin-top: 2em;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 0.3em;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            margin: 0.5em 0;
+        }
+
+        a {
+            text-decoration: none;
+            color: #0077cc;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 
 <body>
 
-  <h1>🎮 jtml Playground</h1>
-  <p>This is a live example using <code>x-get</code> and <code>x-test-data</code>.</p>
+    <h1>jtml Examples</h1>
+    <p>Explore how <code>jtml</code> can be used in real-world scenarios. These examples cover the basics, advanced
+        features, and behavior-driven interactions.</p>
 
-  <form id="playground-form">
-    <textarea id="code" name="code" rows="10" cols="80">
-  <!-- Type your jtml here -->
-  <div x-get="/posts" x-test-data='{ "data": [{"name":"John", "age": 40 },{"name":"Doe", "age": 40}], "pages": 1 }'>
-    <template>
-      <div x-foreach="data">
-          <img x-attr:src="profile"></span>
-          <span x-text="name"></span>
-          <span x-text="age"></span>
-      </div>
-      <div>
-        Pages: <span x-text="pages"></span>
-      </div>
-      <p>static text</p>
-    </template>
-    <div id="out"></div>
-  </div>
-    </textarea>
-    <br />
-    <button id="run-btn" type="submit">Run</button>
-    <button id="share-btn" type="submit">Share</button>
-  </form>
+    <h2>✅ Core Examples</h2>
+    <ul>
+        <li><a href="./get-object.html">GET JSON (Single Object)</a></li>
+        <li><a href="./get-array.html">GET JSON (Array with Templating)</a></li>
+        <li><a href="./x-attr.html">Dynamic Attributes with <code>x-attr</code></a></li>
+        <li><a href="./x-html.html">Rendering Raw HTML with <code>x-html</code></a></li>
+    </ul>
 
-  <hr />
+    <h2>⚙️ Behavioral Examples</h2>
+    <ul>
+        <li><a href="./event-triggers.html">Event Triggers</a></li>
+        <li><a href="./x-target.html">Scoped Targets (<code>x-target</code>)</a></li>
+        <li><a href="./x-scope.html">Using <code>x-scope</code></a></li>
+        <li><a href="./hooks.html">Lifecycle Hooks (<code>x-before</code>, <code>x-after</code>)</a></li>
+    </ul>
 
-  <h2>Output:</h2>
-  <div id="playground-output"></div>
+    <h2>🔬 Advanced & Extras</h2>
+    <ul>
+        <li><a href="./test-data.html">Static Test Data (<code>x-test-data</code>)</a></li>
+        <li><a href="./x-post.html">Form Submission via <code>x-post</code></a></li>
+        <li><a href="./template-refs.html">Scoped Templates</a></li>
+        <li><a href="./error-template.html">Error Templates</a></li>
+    </ul>
 
-  <p style="font-size: 0.8rem; color: #888;">Try editing the <code>x-test-data</code> inline in the HTML!</p>
+    <hr />
+    <p>
+        Want to experiment live? Head over to the <a href="/playground.html">jtml Playground →</a>
+    </p>
 
-  <script src="jtml.js"></script>
-  <script>
-    const textarea = document.getElementById("code");
-    const playgroundOutput = document.getElementById("playground-output");
-    const runBtn = document.getElementById("run-btn");
-    const shareBtn = document.getElementById("share-btn");
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("code")) {
-      const code = decodeURIComponent(params.get("code"));
-      textarea.value = code;
-    }
-
-    function renderPreview(html) {
-      playgroundOutput.innerHTML = html;
-      jtml.render(playgroundOutput); // ← run your library
-    }
-
-    runBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const html = textarea.value;
-      renderPreview(html);
-    });
-
-    shareBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const html = textarea.value;
-      const encoded = encodeURIComponent(html);
-      const newUrl = `${window.location.pathname}?code=${encoded}`;
-      history.replaceState(null, "", newUrl);
-    });
-  </script>
 </body>
 
 </html>

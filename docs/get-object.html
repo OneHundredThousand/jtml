@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>GET JSON (Simple Object) - jtml Example</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 700px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1em;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: monospace;
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .demo {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            background: #fcfcfc;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+    <!-- Include language components you need -->
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+</head>
+
+<body>
+
+    <h1>GET JSON (Simple Object)</h1>
+    <p>
+        This example demonstrates how to fetch a single JSON object from a remote endpoint using
+        <code>x-get</code> and render it using an inline template.
+    </p>
+
+    <p>
+        Inside the template, we use the <code>x-text</code> directive to insert values into the DOM.
+        This sets the <code>textContent</code> of the element based on the response.
+    </p>
+
+    <p>
+        For example, <code>x-text="firstName"</code> means: “set this element’s text to the value of
+        <code>firstName</code> from the JSON response.”
+    </p>
+
+    <p>
+        By default, x-get triggers automatically when the page loads. You can also pair it with an event like x-click
+        for manual activation.
+    </p>
+
+    <p>
+        When the page loads, jtml finds any element with x-get, fetches the data, and uses the &lt;template&gt; inside
+        it to
+        render the result.
+    </p>
+
+    <h2>🧾 Sample API Response</h2>
+    <pre><code class="language-javascript">{
+  "id": 1,
+  "firstName": "Terry",
+  "lastName": "Medhurst",
+  "email": "atuny0@sohu.com",
+  "role": "admin",
+  ...
+}</code></pre>
+
+    <h2>Code Example</h2>
+    <pre><code id="example" class="language-html">
+&lt;div x-get="https://dummyjson.com/users/1"&gt;
+    &lt;template&gt;
+        &lt;div&gt;
+            &lt;h2 x-text="firstName"&gt;&lt;/h2&gt;
+            &lt;p&gt;Email: &lt;span x-text="email"&gt;&lt;/span&gt;&lt;/p&gt;
+            &lt;p&gt;Role: &lt;span x-text="role"&gt;&lt;/span&gt;&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/template&gt;
+&lt;/div&gt;
+    </code></pre>
+
+    <h2>Result</h2>
+
+    <div class="demo">
+        <div x-get="https://dummyjson.com/users/1">
+            <template>
+                <div>
+                    <h2 x-text="firstName"></h2>
+                    <p>Email: <span x-text="email"></span></p>
+                    <p>Role: <span x-text="role"></span></p>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
+
+    <script src="jtml.js"></script>
+    <script>
+        const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
+        const code = document.getElementById("example");
+        const toPlayground = document.getElementById("go-to-playground");
+
+        toPlayground.addEventListener('click', (e) => {
+            e.preventDefault();
+            const html = code.textContent;
+            const encoded = encodeURIComponent(html);
+            const newUrl = `${base}/playground.html?code=${encoded}`;
+            window.location.href = newUrl;
+        })
+
+    </script>
+</body>
+
+</html>
