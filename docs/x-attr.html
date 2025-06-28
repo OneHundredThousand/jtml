@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>GET JSON (Simple Object) - jtml Example</title>
+    <title>Dynamic Attributes with x-attr - jtml Example</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         body {
@@ -36,6 +36,16 @@
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
+        .back {
+            margin-bottom: 2rem;
+        }
+
+        .back>a {
+            text-decoration: none;
+            color: #0077cc;
+            font-weight: bold;
+        }
+
         .tip {
             background: #f5faff;
             border-left: 4px solid #2196F3;
@@ -50,6 +60,12 @@
 </head>
 
 <body>
+
+    <div class="back">
+        <a href="/">
+            ← Back to Examples
+        </a>
+    </div>
 
     <h1>Dynamic Attributes with <code class="language-html">x-attr</code></h1>
     <p>
@@ -115,6 +131,8 @@
         const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
         const code = document.getElementById("example");
         const toPlayground = document.getElementById("go-to-playground");
+
+        document.querySelector('.back>a').href = base || '/';
 
         toPlayground.addEventListener('click', (e) => {
             e.preventDefault();

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Rendering Raw HTML with x-html - jtml Example</title>
+    <title>Event triggers - jtml Example</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         body {
@@ -75,71 +75,79 @@
     </div>
 
 
-    <h1>Rendering Raw HTML with <code>x-html</code></h1>
+    <h1>Event Triggers</h1>
     <p>
-        Sometimes, the data you receive from an API isn’t just plain text — it’s full-on HTML.
-    </p>
-    <p>
-        That’s where <code>x-html</code> comes in. It lets you <strong>inject raw HTML</strong> directly into your
-        elements.
-        Unlike <code>x-text</code>, which sets <code>textContent</code>, <code>x-html</code> sets
-        <code>innerHTML</code>, rendering the markup as real DOM elements.
+        <code>jtml</code> allows you to trigger requests in response to user interactions like clicks or form
+        submissions.
+        This is done using special attributes like <code>x-click</code>, <code>x-submit</code>, and more.
     </p>
 
-    <div class="note">
-        <strong>🚧 Heads-up!</strong>
-        <p style="margin: 0.5em 0 0 0;">
-            Use <code>x-html</code> only when you <strong>trust</strong> the content. Rendering unescaped HTML from
-            unknown sources can expose your page to <abbr title="Cross-Site Scripting">XSS</abbr> vulnerabilities.
-        </p>
-    </div>
+    <h2>⚙️ Available Triggers</h2>
+    <ul>
+        <li><code>x-click</code> — fires when the given element is clicked</li>
+        <li><code>x-submit</code> — fires when a form is submitted</li>
+        <li><em>More coming soon!</em></li>
+    </ul>
 
-    <h2>🧾 Sample API Response</h2>
-    <pre><code class="language-html">
-&lt;h2&gt;Welcome back, Alice!&lt;/h2&gt;
-&lt;p&gt;You have &lt;strong&gt;3 unread messages&lt;/strong&gt;.&lt;/p&gt;
-    </code></pre>
-
-    <h2>Code Example</h2>
-    <pre><code id="example" class="language-html">
-&lt;div x-get="raw.html" x-html&gt;
-&lt;/div&gt;
-    </code></pre>
-
-    <h2>Result</h2>
-
-    <div class="demo">
-        <div x-get="raw.html" x-html>
-        </div>
-    </div>
-
-    <h2>⚙️ Tech Detail: Dynamically Rendered Templates Still Work</h2>
+    <h2>🧠 Default Behavior</h2>
     <p>
-        HTML injected via <code>x-html</code> is <strong>fully parsed</strong>. That means if the injected HTML includes
-        other <code>jtml</code> attributes — like <code>x-get</code>, <code>x-text</code>, or <code>x-foreach</code> —
-        they
-        will still be processed normally.
+        If no event is defined, <code>jtml</code> will automatically fire the request when the page loads. Adding an
+        explicit
+        event like <code>x-click</code> disables that behavior.
     </p>
 
-    <pre><code class="language-html">&lt;!-- Example HTML received from API --&gt;
-&lt;div x-get="/more-info"&gt;
+    <h2>🔐 Trigger Scope</h2>
+    <p>
+        The triggering element <strong>must be a child</strong> of the element that defines the request (e.g.
+        <code>x-get</code>,
+        <code>x-post</code>, etc.). This design enforces locality and ensures that markup remains predictable and easy
+        to reason about.
+    </p>
+
+    <h3>✅ Valid Example</h3>
+    <pre><code class="language-html">&lt;div x-get="/posts/1" x-click="#load-btn"&gt;
+  &lt;button id="load-btn"&gt;Load Post&lt;/button&gt;
   &lt;template&gt;
-    &lt;p x-text="detail"&gt;&lt;/p&gt;
+    &lt;h3 x-text="title"&gt;&lt;/h3&gt;
+    &lt;p x-text="body"&gt;&lt;/p&gt;
   &lt;/template&gt;
 &lt;/div&gt;
 </code></pre>
 
+    <h3>🚫 Gotcha: Invalid Trigger Scope</h3>
     <p>
-        ✅ jtml automatically processes any valid elements it injects — so you can modularize your frontend using
-        server-rendered HTML fragments with full behavior included.
+        If the element you reference in <code>x-click</code> or any other trigger is <em>outside</em> the request
+        container,
+        the request <strong>will not fire</strong>.
     </p>
+    <pre><code class="language-html">&lt;button id="load-btn"&gt;Click Me&lt;/button&gt;
 
-    <div class="note">
-        <strong>🛑 Note:</strong> <br />
-        Any <code>&lt;script&gt;</code> tags included in the injected HTML will be ignored by the browser and will not
-        run.
-        <!-- If you need to include dynamic behavior, use declarative <code>jtml</code> bindings or bring your own JavaScript
-        via hooks. -->
+&lt;!-- This will NOT work --&gt;
+&lt;div x-get="/posts/1" x-click="#load-btn"&gt;
+  &lt;template&gt;...&lt;/template&gt;
+&lt;/div&gt;
+</code></pre>
+    <p><strong>Why?</strong> Because <code>#load-btn</code> is not a child of the element with <code>x-get</code>.</p>
+
+    <h2>💡 Code Example</h2>
+    <pre><code id="example" class="language-html">&lt;div x-get="https://dummyjson.com/posts/1" x-click="#load-post"&gt;
+    &lt;button id="load-post"&gt;Load post!&lt;/button&gt;
+    &lt;template&gt;
+        &lt;h3 x-text="title"&gt;&lt;/h3&gt;
+        &lt;p x-text="body"&gt;&lt;/p&gt;
+    &lt;/template&gt;
+&lt;/div&gt;
+</code></pre>
+
+    <h2>🔎 Result</h2>
+    <div class="demo">
+        <div x-get="https://dummyjson.com/posts/1" x-click="#load-post">
+            <button id="load-post">Load post!</button>
+            <template>
+                <h3 x-text="title"></h3>
+                <p x-text="body"></p>
+            </template>
+        </div>
     </div>
 
     <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
@@ -150,11 +158,7 @@
         const code = document.getElementById("example");
         const toPlayground = document.getElementById("go-to-playground");
 
-        // workaround for github pages
         document.querySelector('.back>a').href = base || '/';
-
-        code.textContent = code.textContent.replace('raw.html', `${base}/raw.html`);
-        document.querySelector('.demo > div').setAttribute('x-get', `${base}/raw.html`);
 
         toPlayground.addEventListener('click', (e) => {
             e.preventDefault();
@@ -162,8 +166,7 @@
             const encoded = encodeURIComponent(html);
             const newUrl = `${base}/playground.html?code=${encoded}`;
             window.location.href = newUrl;
-        })
-
+        });
     </script>
 </body>
 
