@@ -3,8 +3,12 @@
     'x-get': 'GET',
     'x-post': 'POST',
     'x-put': 'PUT',
+    'x-patch': 'PATCH',
   };
   const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
+  const builtinActions = {
+    paginate: builtinPaginate
+  };
 
   function processJtmlElements(elem) {
     Object.keys(XMethodMap).forEach(attrName => {
@@ -69,6 +73,8 @@
       processJtmlElements(target);
     } else {
       renderTemplate(el, data, target);
+      runBuiltinActions(el);
+      runCustomActions(el);
     }
   }
 
@@ -92,8 +98,20 @@
   async function fetchData(el, name) {
     const url = el.getAttribute(name);
     const method = XMethodMap[name];
+
+    const options = {
+      method,
+      headers: {}
+    };
+    const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
+    if (isWriteMethod) {
+      const body = extractRequestBody(el);
+      options.headers["Content-Type"] = "application/json";
+      options.body = JSON.stringify(body);
+    }
+
     try {
-      const res = await fetch(url, { method });
+      const res = await fetch(url, options);
 
       if (el.hasAttribute("x-html")) {
         return res.text();  // Get raw HTML string
@@ -183,8 +201,60 @@
     });
   }
 
+  function extractRequestBody(el) {
+    if (el.tagName === "FORM") {
+      const formData = new FormData(el);
+      const obj = {};
+      for (const [key, value] of formData.entries()) {
+        obj[key] = value;
+      }
+      return obj;
+    }
+
+    return {}; // default if it's not a form
+  }
+
   function getNestedValue(obj, path) {
     return path.split('.').reduce((o, key) => (o ? o[key] : undefined), obj);
+  }
+
+  function builtinPaginate(el) {
+    const rawUrl = el.getAttribute("x-get");
+    if (!rawUrl) {
+      return;
+    }
+
+    const url = new URL(rawUrl, window.location.href);
+    const currentPage = parseInt(url.searchParams.get("page") || "1", 10);
+    url.searchParams.set("page", currentPage + 1);
+
+    // Preserve full URL (relative or absolute)
+    const newUrl = url.origin === window.location.origin
+      ? url.pathname + url.search
+      : url.toString();
+    el.setAttribute("x-get", newUrl);
+  }
+
+  function runBuiltinActions(el) {
+    if (el.hasAttribute("x-paginate")) {
+      builtinActions.paginate(el);
+    }
+  }
+
+  function runCustomActions(el) {
+    if (!window.jtml || !window.jtml.actions) return;
+
+    for (const attr of el.attributes) {
+      if (attr.name.startsWith("x-action-")) {
+        const fnName = attr.name.slice("x-action-".length);
+        const fn = window.jtml.actions[fnName];
+        if (typeof fn === "function") {
+          fn(el);
+        } else {
+          console.warn(`[jtml] Unknown x-action '${fnName}'`);
+        }
+      }
+    }
   }
 
   if (document.readyState !== "loading") {
