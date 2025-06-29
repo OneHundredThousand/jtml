@@ -57,9 +57,6 @@
       return;
     }
 
-    const testData = el.getAttribute('x-test-data');
-    let data = testData ? getTestData(el) : await fetchData(el, attrName);
-
     // Determine the target for output
     const targetSelector = el.getAttribute("x-target");
     const target = targetSelector
@@ -77,12 +74,15 @@
     showLoading(el);
     hideError(el);
     try {
+      const testData = el.getAttribute('x-test-data');
+      const data = testData ? getTestData(el) : await fetchData(el, attrName);
+
       if (el.hasAttribute("x-html")) {
         target.innerHTML = data;
         processJtmlElements(target);
       } else {
         renderTemplate(el, data, target);
-        applyActions(el, "post");
+        applyActions(el, "post", data);
       }
     } catch (err) {
       console.error("[jtml] fetch failed:", err);
@@ -116,7 +116,7 @@
 
     const options = {
       method,
-      headers: customOptions.headers,
+      headers: customOptions.headers || {},
     };
     const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
     if (isWriteMethod) {
@@ -208,7 +208,6 @@
           const attrName = attr.name.slice(7); // strip "x-attr:"
           const dataPath = attr.value;
           const value = getNestedValue(data, dataPath);
-          console.log(attrName, dataPath, value, data)
           el.setAttribute(attrName, value);
           el.removeAttribute(attr.name); // clean up
         }
@@ -248,8 +247,26 @@
   }
 
   function extractRequestBody(el) {
-    if (el.tagName === "FORM") {
-      const formData = new FormData(el);
+    // 1. Check for explicit x-submit target
+    const submitTarget = el.getAttribute("x-submit");
+    let formEl = null;
+
+    if (submitTarget) {
+      // Search for the form inside the element
+      formEl = el.querySelector(submitTarget);
+      if (!formEl) {
+        console.warn("[jtml] x-submit target not found:", submitTarget);
+      }
+    }
+
+    // 2. If no x-submit, fallback: check if this is a form
+    if (!formEl && el.tagName === "FORM") {
+      formEl = el;
+    }
+
+    // 3. Extract form data if form is found
+    if (formEl && formEl.tagName === "FORM") {
+      const formData = new FormData(formEl);
       const obj = {};
       for (const [key, value] of formData.entries()) {
         obj[key] = value;
@@ -257,8 +274,10 @@
       return obj;
     }
 
-    return {}; // default if it's not a form
+    // 4. Default: no form, no data
+    return {};
   }
+
 
   function getNestedValue(obj, path) {
     return path.split('.').reduce((o, key) => (o ? o[key] : undefined), obj);
