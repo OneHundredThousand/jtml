@@ -57,8 +57,11 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
 <!-- /posts returns [{ "name": "name" }] -->
 ```
 
+## 📚 Examples
+[Checkout examples!](https://onehundredthousand.github.io/jtml/)
+
 ## 🎮 Playground
-[🧪 Try it in the Playground!](https://onehundredthousand.github.io/jtml/)
+[🧪 Try it in the Playground!](https://onehundredthousand.github.io/jtml/playground.html)
 
 ## 🔧 How It Works
 
