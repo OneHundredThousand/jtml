@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Scoped Targets (x-target) - jtml Example</title>
+    <title>Static test data - jtml Example</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         body {
@@ -75,82 +75,55 @@
         </a>
     </div>
 
-    <h1>Scoped Targets with <code>x-target</code></h1>
-    <p>
-        By default, <code>jtml</code> renders fetched data into the same element
-        that holds the <code>x-get</code> or <code>x-post</code> attribute.
-    </p>
+    <h1>Test Data with <code>x-test-data</code></h1>
 
     <p>
-        But you can override this using <code>x-target</code>, which lets you
-        specify a child element where the content should be rendered.
+        Use <code>x-test-data</code> to simulate the response of a request without actually making a network call. This
+        is useful for prototyping, demos, or working offline.
     </p>
 
-    <p>
-        This is useful for layouts where you want to preserve buttons or other UI
-        around the template.
-    </p>
+    <ul>
+        <li>You still need an <code>x-get</code>, <code>x-post</code>, etc. to define the action type.</li>
+        <li>The request will not be sent if <code>x-test-data</code> is present.</li>
+        <li>Works for both JSON and raw HTML responses.</li>
+        <li>Must be valid JSON (as a string) — don’t forget to escape your quotes!</li>
+    </ul>
 
-    <h2>📌 Target Scope Limitation</h2>
-    <p>
-        The element referenced by <code>x-target</code> must be a
-        <strong>descendant</strong> of the main element that contains
-        <code>x-get</code> or <code>x-post</code>. This keeps the behavior
-        localized and predictable.
-    </p>
+    <h2>📦 Mocking a JSON Response</h2>
 
-    <p><strong>Default behavior:</strong> If <code>x-target</code> is not defined, the content will replace the entire
-        <code>x-get</code> container.
-    </p>
-
-    <h2>💡 Code Example</h2>
-    <pre><code id="example" class="language-html">&lt;div x-get="https://dummyjson.com/users/2" x-click="#load-user" x-target="#profile-card"&gt;
-  &lt;button id="load-user"&gt;Load Profile&lt;/button&gt;
-
-  &lt;!-- The content will be rendered here --&gt;
-  &lt;section id="profile-card"&gt;&lt;/section&gt;
-
-  &lt;!-- Template --&gt;
+    <pre><code id="example" class="language-html">&lt;div
+  x-get="/fake-api"
+  x-test-data='{"name": "Mocky McMockface", "role": "tester"}'&gt;
   &lt;template&gt;
-    &lt;div&gt;
-      &lt;h2 x-text="firstName"&gt;&lt;/h2&gt;
-      &lt;p&gt;Email: &lt;span x-text="email"&gt;&lt;/span&gt;&lt;/p&gt;
-      &lt;p&gt;Company: &lt;span x-text="company.name"&gt;&lt;/span&gt;&lt;/p&gt;
-    &lt;/div&gt;
+    &lt;h3 x-text="name"&gt;&lt;/h3&gt;
+    &lt;p x-text="role"&gt;&lt;/p&gt;
   &lt;/template&gt;
 &lt;/div&gt;
 </code></pre>
 
-    <h2>🔎 Result</h2>
+    <h2>🎯 Result</h2>
+
     <div class="demo">
-        <div x-get="https://dummyjson.com/users/2" x-click="#load-user" x-target="#profile-card">
-            <button id="load-user">Load Profile</button>
-
-            <!-- The content will be rendered here -->
-            <section id="profile-card"></section>
-
-            <!-- Template -->
+        <div x-get="/fake-api" x-test-data='{"name": "Mocky McMockface", "role": "tester"}'>
             <template>
-                <div>
-                    <h2 x-text="firstName"></h2>
-                    <p>Email: <span x-text="email"></span></p>
-                    <p>Company: <span x-text="company.name"></span></p>
-                </div>
+                <h3 x-text="name"></h3>
+                <p x-text="role"></p>
             </template>
         </div>
     </div>
 
-    <h3>🚫 Gotcha: External Targets Not Supported</h3>
-    <pre><code class="language-html">&lt;!-- ❌ This will NOT work --&gt;
-&lt;div x-get="..." x-target="#outside-target"&gt;
-  &lt;template&gt;...&lt;/template&gt;
+    <div class="tip">
+        <h2>🧩 Mocking Raw HTML</h2>
+        <pre><code class="language-html">&lt;div
+  x-get="/fake-api"
+  x-test-data='"&lt;strong>test&lt;/strong>"'
+  x-html&gt;
 &lt;/div&gt;
-
-&lt;!-- Outside the scope (invalid) --&gt;
-&lt;div id="outside-target"&gt;&lt;/div&gt;
 </code></pre>
-    <p>Only <strong>child</strong> elements are valid targets. This ensures everything is discoverable and colocated.
-    </p>
+        <p> If you're mocking raw HTML, you must use <code>x-html</code> to render the result.
+            Also, <code>x-test-data</code> must contain a valid JSON string — wrap your HTML in quotes!
+        </p>
+    </div>
 
     <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
 

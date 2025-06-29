@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Loading and errors - jtml Example</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: sans-serif;
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 1em;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: monospace;
+        }
+
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+
+        .demo {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            background: #fcfcfc;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .back {
+            margin-bottom: 2rem;
+        }
+
+        .back>a {
+            text-decoration: none;
+            color: #0077cc;
+            font-weight: bold;
+        }
+
+        .tip {
+            background: #f5faff;
+            border-left: 4px solid #2196F3;
+            padding: 1em;
+            margin: 1.5em 0;
+        }
+
+        .note {
+            border-left: 4px solid #ffa500;
+            background: #fffbe6;
+            padding: 1em;
+            margin: 1.5em 0;
+        }
+    </style>
+    <link href="https://cdn.jsdelivr.net/npm/prismjs@1/themes/prism.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+    <!-- Include language components you need -->
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-javascript.min.js"></script>
+</head>
+
+<body>
+
+    <div class="back">
+        <a href="/">
+            ← Back to Examples
+        </a>
+    </div>
+
+    <h1>x-loading and x-error</h1>
+
+    <p>
+        These attributes help display feedback to the user while data is loading or when something goes wrong.
+    </p>
+
+    <h2>🌀 <code>x-loading</code></h2>
+    <ul>
+        <li>Visible <strong>only</strong> while the request is in progress.</li>
+        <li>Automatically hidden once the request completes (whether it succeeds or fails).</li>
+        <li>Works on any element — including <code>&lt;div&gt;</code>, <code>&lt;span&gt;</code>, or
+            <code>&lt;button&gt;</code>.
+        </li>
+    </ul>
+
+    <h2>❌ <code>x-error</code></h2>
+    <ul>
+        <li>Shown when a request fails (network error, invalid JSON, or bad HTTP response).</li>
+        <li>Stays visible until the next successful request.</li>
+        <li>Useful for retry prompts or status messages.</li>
+        <li>You can use <code>x-text</code> inside an error element to show the error message.</li>
+    </ul>
+
+    <h2>✨ Behavior Notes</h2>
+    <ul>
+        <li>These elements do <strong>not</strong> require a <code>&lt;template&gt;</code>.</li>
+        <li>They must be children of the element with <code>x-get</code>, <code>x-post</code>, etc.</li>
+        <li><code>x-loading</code> and <code>x-error</code> can be styled however you'd like — they're just regular
+            elements with toggled visibility.</li>
+        <li><code>x-error</code> supports rendering the error message using <code>x-text</code>.</li>
+    </ul>
+
+    <h2>Code Examples</h2>
+
+    <pre><code id="example" class="language-html">&lt;div x-get="https://dummyjson.com/products?delay=1000&limit=10" x-click="#load" x-target="#product-list"&gt;
+
+    &lt;template&gt;
+        &lt;div x-foreach="products"&gt;
+            &lt;p x-text="title"&gt;&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/template&gt;
+
+    &lt;button id="load"&gt;Load products&lt;/button&gt;
+
+    &lt;p x-loading&gt;Loading products...&lt;/p&gt;
+
+    &lt;div id="product-list"&gt;&lt;/div&gt;
+
+&lt;/div&gt;
+</code></pre>
+
+    <h2>Result</h2>
+    <div class="demo">
+        <div x-get="https://dummyjson.com/products?delay=1000&limit=10" x-click="#load" x-target="#product-list">
+
+            <template>
+                <div x-foreach="products">
+                    <p x-text="title"></p>
+                </div>
+            </template>
+
+            <button id="load">Load products</button>
+
+            <p x-loading>Loading products...</p>
+
+            <div id="product-list"></div>
+
+        </div>
+    </div>
+
+    <div class="tip">
+        <h2>Handling errors</h2>
+        <pre><code class="language-html">&lt;div x-get="/error" x-click="#load" x-target="#product-list"&gt;
+
+    &lt;template&gt;
+        &lt;div x-foreach="products"&gt;
+            &lt;p x-text="title"&gt;&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/template&gt;
+
+    &lt;button id="load"&gt;Load products&lt;/button&gt;
+
+    &lt;p x-error&gt;&lt;span x-text="error"&gt;&lt;/span&gt; Something went please try again&lt;/p&gt;
+
+    &lt;div id="product-list"&gt;&lt;/div&gt;
+
+&lt;/div&gt;
+</code></pre>
+    </div>
+
+    <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
+
+    <script src="jtml.js"></script>
+    <script>
+        const base = window.location.pathname.includes('/jtml/') ? '/jtml' : '';
+        const code = document.getElementById("example");
+        const toPlayground = document.getElementById("go-to-playground");
+
+        document.querySelector('.back>a').href = base || '/';
+
+        toPlayground.addEventListener('click', (e) => {
+            e.preventDefault();
+            const html = code.textContent;
+            const encoded = encodeURIComponent(html);
+            const newUrl = `${base}/playground.html?code=${encoded}`;
+            window.location.href = newUrl;
+        });
+    </script>
+</body>
+
+</html>

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Scoped Targets (x-target) - jtml Example</title>
+    <title>Submitting Forms - jtml Example</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
         body {
@@ -75,82 +75,72 @@
         </a>
     </div>
 
-    <h1>Scoped Targets with <code>x-target</code></h1>
-    <p>
-        By default, <code>jtml</code> renders fetched data into the same element
-        that holds the <code>x-get</code> or <code>x-post</code> attribute.
-    </p>
+    <h1>Submitting Forms with <code>x-post</code></h1>
 
     <p>
-        But you can override this using <code>x-target</code>, which lets you
-        specify a child element where the content should be rendered.
+        Form submissions in <code>jtml</code> work almost exactly like native HTML — but with a modern twist.
     </p>
 
-    <p>
-        This is useful for layouts where you want to preserve buttons or other UI
-        around the template.
-    </p>
+    <ul>
+        <li>✅ You still use regular <code>&lt;form&gt;</form></code> elements.</li>
+        <li>✅ You still submit with a <code>&lt;input type="submit"&gt;</button></code> or
+            <code>&lt;button type="submit"&gt;&lt;/button&gt;</code>.
+        </li>
+        <li>✅ You still use <code>&lt;input name="..."&gt;</code> to define form data.</li>
+    </ul>
 
-    <h2>📌 Target Scope Limitation</h2>
-    <p>
-        The element referenced by <code>x-target</code> must be a
-        <strong>descendant</strong> of the main element that contains
-        <code>x-get</code> or <code>x-post</code>. This keeps the behavior
-        localized and predictable.
-    </p>
+    <p>What's different?</p>
 
-    <p><strong>Default behavior:</strong> If <code>x-target</code> is not defined, the content will replace the entire
-        <code>x-get</code> container.
-    </p>
+    <ul>
+        <li>🛑 <code>x-submit</code> prevents the page from refreshing or redirecting.</li>
+        <li>📦 <code>x-post </code> serializes the form data as JSON and sends it to your API.</li>
+        <li>🧩 You can define a <code>&lt;template&gt;&lt;/template&gt;</code> and <code>x-target</code> to handle the
+            response directly.</li>
+        <li>The payload is extracted from the form specified by <code>x-submit="#id"</code> when it is submitted.</li>
+    </ul>
 
-    <h2>💡 Code Example</h2>
-    <pre><code id="example" class="language-html">&lt;div x-get="https://dummyjson.com/users/2" x-click="#load-user" x-target="#profile-card"&gt;
-  &lt;button id="load-user"&gt;Load Profile&lt;/button&gt;
+    <h2>Code Example</h2>
+    <pre><code id="example" class="language-html">&lt;div x-post="https://dummyjson.com/products/add" x-submit="#my-form" x-target="#post-result"&gt;
+    &lt;form id="my-form"&gt;
+        &lt;input name="title" placeholder="Product title" required /&gt;
+        &lt;input name="price" placeholder="Product price" required /&gt;
+        &lt;button type="submit"&gt;Add Product&lt;/button&gt;
+    &lt;/form&gt;
 
-  &lt;!-- The content will be rendered here --&gt;
-  &lt;section id="profile-card"&gt;&lt;/section&gt;
+    &lt;template&gt;
+        &lt;div&gt;
+            &lt;br /&gt;
+            &lt;strong&gt;New Product Created:&lt;/strong&gt;
+            &lt;p&gt;📝 &lt;span x-text="title"&gt;&lt;/span&gt;&lt;/p&gt;
+            &lt;p&gt;📄 &lt;span x-text="price"&gt;&lt;/span&gt;&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/template&gt;
 
-  &lt;!-- Template --&gt;
-  &lt;template&gt;
-    &lt;div&gt;
-      &lt;h2 x-text="firstName"&gt;&lt;/h2&gt;
-      &lt;p&gt;Email: &lt;span x-text="email"&gt;&lt;/span&gt;&lt;/p&gt;
-      &lt;p&gt;Company: &lt;span x-text="company.name"&gt;&lt;/span&gt;&lt;/p&gt;
-    &lt;/div&gt;
-  &lt;/template&gt;
+    &lt;div id="post-result"&gt;&lt;/div&gt;
 &lt;/div&gt;
 </code></pre>
 
-    <h2>🔎 Result</h2>
+    <h2>Result</h2>
     <div class="demo">
-        <div x-get="https://dummyjson.com/users/2" x-click="#load-user" x-target="#profile-card">
-            <button id="load-user">Load Profile</button>
+        <div x-post="https://dummyjson.com/products/add" x-submit="#my-form" x-target="#post-result">
+            <form id="my-form">
+                <input name="title" placeholder="Product title" required />
+                <input name="price" placeholder="Product price" required />
+                <button type="submit">Add Product</button>
+            </form>
 
-            <!-- The content will be rendered here -->
-            <section id="profile-card"></section>
-
-            <!-- Template -->
             <template>
                 <div>
-                    <h2 x-text="firstName"></h2>
-                    <p>Email: <span x-text="email"></span></p>
-                    <p>Company: <span x-text="company.name"></span></p>
+                    <br />
+                    <strong>New Product Created:</strong>
+                    <p>📝 <span x-text="title"></span></p>
+                    <p>📄 <span x-text="price"></span></p>
                 </div>
             </template>
+
+            <div id="post-result"></div>
         </div>
     </div>
-
-    <h3>🚫 Gotcha: External Targets Not Supported</h3>
-    <pre><code class="language-html">&lt;!-- ❌ This will NOT work --&gt;
-&lt;div x-get="..." x-target="#outside-target"&gt;
-  &lt;template&gt;...&lt;/template&gt;
-&lt;/div&gt;
-
-&lt;!-- Outside the scope (invalid) --&gt;
-&lt;div id="outside-target"&gt;&lt;/div&gt;
-</code></pre>
-    <p>Only <strong>child</strong> elements are valid targets. This ensures everything is discoverable and colocated.
-    </p>
 
     <p>Want to experiment? <a id="go-to-playground" href="playground.html">Try this in the playground →</a></p>
 
