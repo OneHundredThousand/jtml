@@ -7,48 +7,111 @@
     'x-delete': 'DELETE',
   };
   const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
-  const actions = {}
-  const _globalActions = [];
+  const builtInActions = {
+    paginate: {
+      post: builtinPaginate,
+    },
+  };
+  const actions = {
+    ...builtInActions,
+  }
+  const globalActions = [];
 
-  function processJtmlElements(elem) {
+  function processJtmlElements(elem = document) {
     Object.keys(XMethodMap).forEach(attrName => {
-      elem.querySelectorAll(`[${attrName}]`).forEach(el => {
-        const handler = (e) => {
-          e?.preventDefault();
-          attachRequest(el, attrName);
-        };
-        const event = getEventTrigger(el);
-        if (event) {
-          const triggerSelector = el.getAttribute(`x-${event}`)
-          const triggerEl = triggerSelector ? el.querySelector(triggerSelector) : el;
-
-          if (!triggerEl) {
-            console.warn(`[jtml] x-click selector '${triggerSelector}' not found inside element:`, el);
-            return;
-          }
-
-          triggerEl.addEventListener(event, handler);
-        } else {
-          // No custom trigger, fire immediately
-          handler();
-        }
+      const targets = elem.querySelectorAll(`[${attrName}]`);
+      targets.forEach(requestEl => {
+        setupRequestTrigger(requestEl, attrName);
       });
     });
-    document.querySelectorAll("[x-loading], [x-error]").forEach(el => {
+
+    hideInitialUiMarkers(elem);
+  }
+
+  function hideInitialUiMarkers(root) {
+    root.querySelectorAll("[x-loading], [x-error]").forEach(el => {
       el.style.display = "none";
     });
   }
 
-  function getEventTrigger(el) {
+  function setupRequestTrigger(requestEl, attrName) {
+    const event = resolveTrigger(requestEl);
+    if (event) {
+      const { name, triggerEl } = event;
+      triggerEl.addEventListener(name, e => {
+        e.preventDefault();
+        attachRequest(requestEl, attrName);
+      });
+    } else {
+      // No trigger declared (e.g. x-click), fetch immediately on page load
+      attachRequest(requestEl, attrName);
+    }
+  }
+
+  function resolveTrigger(el) {
     for (const attr of el.attributes) {
-      if (attr.name.startsWith("x-")) {
-        const event = attr.name.slice(2); // e.g. "click"
-        if (SupportedEvents.includes(event)) {
-          return event;
-        }
+      if (!attr.name.startsWith("x-")) {
+        continue;
       }
+
+      const event = attr.name.slice(2);
+      if (!SupportedEvents.includes(event)) {
+        continue;
+      }
+
+      return {
+        name: event,
+        triggerEl: resolveLocalAttrElem(el, attr.name),
+      };
     }
     return null;
+  }
+
+  function resolveSelector(el, selector) {
+    try {
+      const target = el.querySelector(selector);
+      if (!target) {
+        return null;
+      }
+      return target;
+    } catch (err) {
+      console.warn(`[jtml] Invalid selector '${selector}':`, err);
+      return null;
+    }
+  }
+
+  function resolveLocalAttrElem(elem, attr) {
+    const selector = elem.getAttribute(attr);
+    if (!selector) {
+      return elem;
+    }
+
+    const triggerEl = resolveSelector(elem, selector);
+    if (!triggerEl) {
+      console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, elem);
+      return elem;
+    }
+
+    return triggerEl;
+  }
+
+  function resolveScopedAttrElem(elem, attr) {
+    const selector = elem.getAttribute(attr);
+    if (!selector) {
+      return elem;
+    }
+
+    const triggerEl = resolveSelector(elem, selector);
+    if (!triggerEl) {
+      const scope = elem.closest('[x-scoped]');
+      if (!scope) {
+        console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, elem);
+        return elem;
+      }
+      return resolveSelector(scope, selector);
+    }
+
+    return triggerEl;
   }
 
   async function attachRequest(el, attrName) {
@@ -57,41 +120,55 @@
       return;
     }
 
-    // Determine the target for output
-    const targetSelector = el.getAttribute("x-target");
-    const target = targetSelector
-      ? findScopedTarget(el, targetSelector)
-      : el;
+    const target = resolveScopedAttrElem(el, 'x-target');
 
-    if (targetSelector && !target) {
-      console.warn(
-        "[jtml] Target not found inside scoped container:",
-        targetSelector
-      );
+    showBySelector(el, '[x-loading]');
+    hideBySelector(el, '[x-error]');
+    hideBySelector(el, '[x-error-data]');
+    try {
+      const response = await handleRequest(el, attrName);
+      handleResponse(el, response, target);
+    } catch (err) {
+      console.error("[jtml] fetch failed:", err);
+      showBySelector(el, '[x-error]');
+      applyTextBindings(el, err);
+    } finally {
+      hideBySelector(el, '[x-loading]');
+    }
+  }
+
+  async function handleRequest(el, attrName) {
+    const testData = el.getAttribute('x-test-data');
+    if (testData) {
+      return getTestData(el);
+    }
+    return fetchData(el, attrName);
+  }
+
+  function handleResponse(el, response, target) {
+    if (response.error) {
+      handleErrors(el, response);
+      return;
+    }
+    if (el.hasAttribute("x-html")) {
+      target.innerHTML = response.data;
+      processJtmlElements(target);
+    } else {
+      renderTemplate(el, response.data, target);
+      applyActions(el, "post", response.data);
+    }
+  }
+
+  function handleErrors(el, response) {
+    const errorDataEl = el.querySelector('[x-error-data]');
+    if (!errorDataEl || !response.data) {
+      showBySelector(el, '[x-error]');
       return;
     }
 
-    showLoading(el);
-    hideError(el);
-    try {
-      const testData = el.getAttribute('x-test-data');
-      const data = testData ? getTestData(el) : await fetchData(el, attrName);
-
-      if (el.hasAttribute("x-html")) {
-        target.innerHTML = data;
-        processJtmlElements(target);
-      } else {
-        renderTemplate(el, data, target);
-        applyActions(el, "post", data);
-      }
-    } catch (err) {
-      console.error("[jtml] fetch failed:", err);
-      showError(el, err);
-    } finally {
-      hideLoading(el);
-    }
+    showBySelector(el, '[x-error-data]');
+    applyTextBindings(errorDataEl, response.data);
   }
-  var e = 0;
 
   function getTestData(el) {
     const testData = el.getAttribute('x-test-data');
@@ -102,10 +179,10 @@
     try {
       const data = JSON.parse(testData);
       console.info('[jtml] Using x-test-data');
-      return data;
-    } catch (e) {
-      console.error('[jtml] Invalid x-test-data:', e);
-      return;
+      return { data };
+    } catch (error) {
+      console.error('[jtml] Invalid x-test-data:', error);
+      return { error };
     }
   }
 
@@ -127,15 +204,18 @@
 
     try {
       const res = await fetch(url, options);
+      const error = res.status >= 400;
 
       if (el.hasAttribute("x-html")) {
-        return res.text();  // Get raw HTML string
+        const textData = await res.text();
+        return { error, data: textData };  // Get raw HTML string
       }
 
-      return res.json();
-    } catch (err) {
-      console.error('[jtml] fetch failed:', url, err);
-      return;
+      const jsonData = await res.json();
+      return { error, data: jsonData };
+    } catch (error) {
+      console.error('[jtml] fetch failed:', url, error);
+      throw { error };
     }
   }
 
@@ -153,14 +233,6 @@
     applyAttrBindings(content, response);
 
     target.appendChild(content);
-  }
-
-  function findScopedTarget(container, selector) {
-    // Start from the container that has x-get / x-post / etc.
-    let scope = container.closest('[x-scoped]') || container;
-
-    // Use querySelector *inside* the scope
-    return scope.querySelector(selector);
   }
 
   function processForeachBlocks(content, response) {
@@ -202,135 +274,133 @@
   }
 
   function applyAttrBindings(fragment, data) {
-    fragment.querySelectorAll("*").forEach(el => {
-      [...el.attributes].forEach(attr => {
-        if (attr.name.startsWith("x-attr:")) {
-          const attrName = attr.name.slice(7); // strip "x-attr:"
-          const dataPath = attr.value;
-          const value = getNestedValue(data, dataPath);
-          el.setAttribute(attrName, value);
-          el.removeAttribute(attr.name); // clean up
+    const elements = fragment.querySelectorAll("*");
+    for (const el of elements) {
+      for (const attr of el.attributes) {
+        if (!attr.name.startsWith("x-attr:")) {
+          continue;
         }
-      });
-    });
-  }
 
-  function showLoading(el) {
-    const loadingEl = el.querySelector("[x-loading]");
-    if (loadingEl) {
-      loadingEl.style.display = "";
+        const attrName = attr.name.slice(7); // remove "x-attr:"
+        const dataPath = attr.value;
+        const value = getNestedValue(data, dataPath);
+
+        if (value) {
+          el.setAttribute(attrName, value);
+        }
+        el.removeAttribute(attr.name); // remove x-attr
+      }
     }
   }
 
-  function hideLoading(el) {
-    const loadingEl = el.querySelector("[x-loading]");
-    if (loadingEl) {
-      loadingEl.style.display = "none";
+  function showBySelector(el, selector) {
+    try {
+      const elem = el.querySelector(selector);
+      if (!elem) {
+        return;
+      }
+
+      if (elem.style.display === 'none') {
+        elem.style.display = '';
+      }
+    } catch (e) {
+      console.warn(`[jtml] Invalid selector '${selector}' inside element:`, el);
     }
   }
 
-  function showError(el, errorData) {
-    const errorEl = el.querySelector("[x-error]");
-    if (!errorEl) {
-      return;
-    }
+  function hideBySelector(el, selector) {
+    try {
+      const elem = el.querySelector(selector);
+      if (!elem) {
+        return;
+      }
 
-    applyTextBindings(el, errorData || {});
-    errorEl.style.display = "";
-  }
-
-  function hideError(el) {
-    const errorEl = el.querySelector("[x-error]");
-    if (errorEl) {
-      errorEl.style.display = "none";
+      elem.style.display = 'none';
+    } catch (e) {
+      console.warn(`[jtml] Invalid selector '${selector}' inside element:`, el);
     }
   }
 
   function extractRequestBody(el) {
-    // 1. Check for explicit x-submit target
-    const submitTarget = el.getAttribute("x-submit");
-    let formEl = null;
-
-    if (submitTarget) {
-      // Search for the form inside the element
-      formEl = el.querySelector(submitTarget);
-      if (!formEl) {
-        console.warn("[jtml] x-submit target not found:", submitTarget);
-      }
+    const formEl = resolveLocalAttrElem(el, 'x-submit');
+    if (formEl.tagName !== 'FORM') {
+      return {};
     }
 
-    // 2. If no x-submit, fallback: check if this is a form
-    if (!formEl && el.tagName === "FORM") {
-      formEl = el;
+    const formData = new FormData(formEl);
+    const obj = {};
+    for (const [key, value] of formData.entries()) {
+      obj[key] = value;
     }
-
-    // 3. Extract form data if form is found
-    if (formEl && formEl.tagName === "FORM") {
-      const formData = new FormData(formEl);
-      const obj = {};
-      for (const [key, value] of formData.entries()) {
-        obj[key] = value;
-      }
-      return obj;
-    }
-
-    // 4. Default: no form, no data
-    return {};
+    return obj;
   }
-
 
   function getNestedValue(obj, path) {
-    return path.split('.').reduce((o, key) => (o ? o[key] : undefined), obj);
+    return path
+      .split('.')
+      .reduce((o, key) => {
+        if (o) {
+          return o[key];
+        }
+        return undefined;
+      }, obj);
   }
 
-  function builtinPaginate(el) {
+  function builtinPaginate(ctx) {
+    const el = ctx.el;
     const rawUrl = el.getAttribute("x-get");
     if (!rawUrl) {
       return;
     }
 
-    const url = new URL(rawUrl, window.location.href);
+    let url;
+    try {
+      url = new URL(rawUrl, window.location.href);
+    } catch (err) {
+      console.warn("[jtml] Invalid x-get URL for pagination:", rawUrl);
+      return;
+    }
+
     const currentPage = parseInt(url.searchParams.get("page") || "1", 10);
     url.searchParams.set("page", currentPage + 1);
 
-    // Preserve full URL (relative or absolute)
     const newUrl = url.origin === window.location.origin
       ? url.pathname + url.search
       : url.toString();
+
     el.setAttribute("x-get", newUrl);
   }
 
-  function applyActions(el, phase, response = null) {
-    const actionAttrs = Array.from(el.attributes).filter(attr =>
-      attr.name.startsWith("x-action-")
-    );
+  function applyActions(el, phase, response) {
+    const actionAttrs = Array
+      .from(el.attributes)
+      .filter(attr => attr.name.startsWith("x-action-"));
 
-    const options = {}
+    const ctx = { el, response };
 
     for (const attr of actionAttrs) {
-      const name = attr.name.replace("x-action-", "");
+      const name = attr.name.slice(9);
       const action = actions[name];
+      const fn = action?.[phase];
 
-      if (typeof action !== "object") continue;
-
-      if (phase === "pre" && typeof action.pre === "function") {
-        action.pre(el, options);
-      } else if (phase === "post" && typeof action.post === "function") {
-        action.post(el, response, options);
+      if (typeof fn !== 'function') {
+        console.warn(`[jtml] Action "${name}" does not have a valid ${phase}() function`);
+        continue;
       }
+
+      fn(ctx);
     }
 
-    if (phase === "pre") {
-      _globalActions.forEach(fn => {
-        if (typeof fn.pre === "function") fn.pre(el, options);
-      });
-    } else if (phase === "post") {
-      _globalActions.forEach(fn => {
-        if (typeof fn.post === "function") fn.post(el, response, options);
-      });
-    }
+    globalActions.forEach(fn => {
+      if (typeof fn !== 'function') {
+        console.warn(`[jtml] Registered global action is not a function:`, fn);
+        return;
+      }
 
-    return options;
+      fn(ctx);
+    });
+
+    return ctx;
   }
 
   if (document.readyState !== "loading") {
@@ -339,21 +409,18 @@
     document.addEventListener("DOMContentLoaded", () => processJtmlElements(document.body));
   }
 
-  function registerAction(name, fn) {
-    actions[name] = fn;
-  }
-
-  registerAction("paginate", {
-    post: builtinPaginate,
-  });
-
   window.jtml = {
     render: processJtmlElements,
     addGlobalAction: (fn) => {
       if (typeof fn === "function") {
-        _globalActions.push(fn);
+        globalActions.push(fn);
       }
     },
-    registerAction,
+    registerAction: (name, fn) => {
+      if (!name.startsWith("user:")) {
+        console.warn(`[jtml] Custom actions should be prefixed with "user:". Got "${name}".`);
+      }
+      actions[name] = fn;
+    },
   }
 })();
