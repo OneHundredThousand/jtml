@@ -53,7 +53,7 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
     </div>
   </template>
 </div>
-<script src="jtml.js"></script>
+<script src="jtml-min.js"></script>
 <!-- /posts returns [{ "name": "name" }] -->
 ```
 
@@ -76,7 +76,7 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
 Just drop it in:
 
 ```html
-<script src="jtml.js"></script>
+<script src="jtml-min.js"></script>
 ```
 
 ## 🌱 Philosophy
