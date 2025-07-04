@@ -1,3 +1,5 @@
+import { renderTemplate } from './template-engine.js';
+
 const XMethodMap = {
   'x-get': 'GET',
   'x-post': 'POST',
@@ -130,7 +132,6 @@ async function attachRequest(el, attrName) {
   } catch (err) {
     console.error("[jtml] fetch failed:", err);
     showBySelector(el, '[x-error]');
-    applyTextBindings(el, err);
   } finally {
     hideBySelector(el, '[x-loading]');
   }
@@ -153,7 +154,15 @@ function handleResponse(el, response, target) {
     target.innerHTML = response.data;
     processJtmlElements(target);
   } else {
-    renderTemplate(el, response.data, target);
+    const template = el.querySelector("template");
+    if (!template) {
+      return;
+    }
+
+    const renderedDom = renderTemplate(template, response.data);
+    target.innerHTML = "";
+    target.appendChild(renderedDom);
+
     applyActions(el, "post", response.data);
   }
 }
@@ -218,80 +227,6 @@ async function fetchData(el, name) {
   }
 }
 
-function renderTemplate(container, response, target) {
-  const template = container.querySelector("template");
-  if (!template) {
-    return;
-  }
-
-  const content = template.content.cloneNode(true);
-  target.innerHTML = "";
-
-  processForeachBlocks(content, response, target);
-  applyTextBindings(content, response);
-  applyAttrBindings(content, response);
-
-  target.appendChild(content);
-}
-
-function processForeachBlocks(content, response) {
-  const foreachBlocks = content.querySelectorAll("[x-foreach]");
-  foreachBlocks.forEach(loopEl => {
-    const path = loopEl.getAttribute("x-foreach");
-    const loopData = path ? getNestedValue(response, path) : response;
-
-    if (!Array.isArray(loopData)) {
-      console.warn("x-foreach expected an array but got", loopData);
-      return;
-    }
-
-    const cloneContainer = document.createDocumentFragment();
-
-    loopData.forEach(item => {
-      const inner = loopEl.cloneNode(true);
-      applyTextBindings(inner, item);
-      applyAttrBindings(inner, item);
-      cloneContainer.appendChild(inner);
-    });
-
-    // Replace loopEl with its clones, not append to target directly
-    loopEl.replaceWith(cloneContainer);
-  });
-}
-
-function applyTextBindings(fragment, data) {
-  if (!fragment.querySelectorAll) {
-    return;
-  }
-
-  fragment.querySelectorAll("[x-text]").forEach(el => {
-    const path = el.getAttribute("x-text");
-    const value = getNestedValue(data, path);
-    el.removeAttribute("x-text");
-    el.textContent = value;
-  });
-}
-
-function applyAttrBindings(fragment, data) {
-  const elements = fragment.querySelectorAll("*");
-  for (const el of elements) {
-    for (const attr of el.attributes) {
-      if (!attr.name.startsWith("x-attr:")) {
-        continue;
-      }
-
-      const attrName = attr.name.slice(7); // remove "x-attr:"
-      const dataPath = attr.value;
-      const value = getNestedValue(data, dataPath);
-
-      if (value) {
-        el.setAttribute(attrName, value);
-      }
-      el.removeAttribute(attr.name); // remove x-attr
-    }
-  }
-}
-
 function showBySelector(el, selector) {
   try {
     const elem = el.querySelector(selector);
@@ -332,17 +267,6 @@ function extractRequestBody(el) {
     obj[key] = value;
   }
   return obj;
-}
-
-function getNestedValue(obj, path) {
-  return path
-    .split('.')
-    .reduce((o, key) => {
-      if (o) {
-        return o[key];
-      }
-      return undefined;
-    }, obj);
 }
 
 function builtinPaginate(ctx) {

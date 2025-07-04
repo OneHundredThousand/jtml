@@ -208,20 +208,20 @@
     <script src="jtml-min.js"></script>
     <script>
         jtml.registerAction("log", {
-            pre(el) {
-                console.log("⏳ Sending request to", el.getAttribute("x-get"));
+            pre(ctx) {
+                console.log("⏳ Sending request to", ctx.el.getAttribute("x-get"));
             },
-            post(el, res) {
-                console.log("✅ Response received:", res);
+            post(ctx) {
+                console.log("✅ Response received:", ctx.res);
             },
         });
 
         jtml.addGlobalAction({
-            pre(el) {
-                console.log("🌐 Global pre-request:", el.getAttribute("x-get"));
+            pre(ctx) {
+                console.log("🌐 Global pre-request:", ctx.el.getAttribute("x-get"));
             },
-            post(el, res) {
-                console.log("🌍 Global post-response:", res);
+            post(ctx) {
+                console.log("🌍 Global post-response:", ctx.res);
             }
         });
     </script>
