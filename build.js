@@ -6,7 +6,7 @@ esbuild.build({
     bundle: true,
     minify: true,
     sourcemap: true,
-    outfile: 'dist/bundle.js',
+    outfile: 'dist/jtml-min.js',
     target: ['es6'],
     format: 'iife', // Good for directly including in HTML
 }).catch(() => process.exit(1));
