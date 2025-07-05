@@ -2,7 +2,7 @@
 const esbuild = require('esbuild');
 
 esbuild.build({
-    entryPoints: ['src/main.js'], // Your main file
+    entryPoints: ['src/main.ts'], // Your main file
     bundle: true,
     minify: true,
     sourcemap: true,

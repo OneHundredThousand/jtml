@@ -1,4 +1,6 @@
-import { renderTemplate } from './template-engine.js';
+import { renderTemplate } from './template-engine';
+
+type HookFunction = { pre?: Function, post?: Function }
 
 const XMethodMap = {
   'x-get': 'GET',
@@ -8,7 +10,7 @@ const XMethodMap = {
   'x-delete': 'DELETE',
 };
 const SupportedEvents = ["click", "submit", "input", "change"]; // extend as needed
-const builtInActions = {
+const builtInActions: { [name: string]: HookFunction } = {
   paginate: {
     post: builtinPaginate,
   },
@@ -16,30 +18,30 @@ const builtInActions = {
 const actions = {
   ...builtInActions,
 }
-const globalActions = [];
+const globalActions: HookFunction[] = [];
 
-function processJtmlElements(elem = document) {
+function processJtmlElements(elem: HTMLElement = document.body): void {
   Object.keys(XMethodMap).forEach(attrName => {
     const targets = elem.querySelectorAll(`[${attrName}]`);
     targets.forEach(requestEl => {
-      setupRequestTrigger(requestEl, attrName);
+      setupRequestTrigger(requestEl as HTMLElement, attrName);
     });
   });
 
   hideInitialUiMarkers(elem);
 }
 
-function hideInitialUiMarkers(root) {
+function hideInitialUiMarkers(root: HTMLElement): void {
   root.querySelectorAll("[x-loading], [x-error]").forEach(el => {
-    el.style.display = "none";
+    (el as HTMLElement).style.display = "none";
   });
 }
 
-function setupRequestTrigger(requestEl, attrName) {
+function setupRequestTrigger(requestEl: HTMLElement, attrName: string): void {
   const event = resolveTrigger(requestEl);
   if (event) {
     const { name, triggerEl } = event;
-    triggerEl.addEventListener(name, e => {
+    triggerEl.addEventListener(name, (e: Event) => {
       e.preventDefault();
       attachRequest(requestEl, attrName);
     });
@@ -49,7 +51,7 @@ function setupRequestTrigger(requestEl, attrName) {
   }
 }
 
-function resolveTrigger(el) {
+function resolveTrigger(el: HTMLElement): { name: string, triggerEl: HTMLElement } | null {
   for (const attr of el.attributes) {
     if (!attr.name.startsWith("x-")) {
       continue;
@@ -68,20 +70,20 @@ function resolveTrigger(el) {
   return null;
 }
 
-function resolveSelector(el, selector) {
+function resolveSelector(el: HTMLElement, selector: string): HTMLElement | null {
   try {
     const target = el.querySelector(selector);
     if (!target) {
       return null;
     }
-    return target;
+    return target as HTMLElement;
   } catch (err) {
     console.warn(`[jtml] Invalid selector '${selector}':`, err);
     return null;
   }
 }
 
-function resolveLocalAttrElem(elem, attr) {
+function resolveLocalAttrElem(elem: HTMLElement, attr: string): HTMLElement {
   const selector = elem.getAttribute(attr);
   if (!selector) {
     return elem;
@@ -96,7 +98,7 @@ function resolveLocalAttrElem(elem, attr) {
   return triggerEl;
 }
 
-function resolveScopedAttrElem(elem, attr) {
+function resolveScopedAttrElem(elem: HTMLElement, attr: string): HTMLElement | null {
   const selector = elem.getAttribute(attr);
   if (!selector) {
     return elem;
@@ -109,13 +111,13 @@ function resolveScopedAttrElem(elem, attr) {
       console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, elem);
       return elem;
     }
-    return resolveSelector(scope, selector);
+    return resolveSelector(scope as HTMLElement, selector);
   }
 
   return triggerEl;
 }
 
-async function attachRequest(el, attrName) {
+async function attachRequest(el: HTMLElement, attrName: string): Promise<void> {
   const method = XMethodMap[attrName];
   if (!method) {
     return;
@@ -137,7 +139,7 @@ async function attachRequest(el, attrName) {
   }
 }
 
-async function handleRequest(el, attrName) {
+async function handleRequest(el: HTMLElement, attrName: string): Promise<{ data?: object | string, error?: object | boolean } | null> {
   const testData = el.getAttribute('x-test-data');
   if (testData) {
     return getTestData(el);
@@ -175,13 +177,13 @@ function handleErrors(el, response) {
   }
 
   showBySelector(el, '[x-error-data]');
-  applyTextBindings(errorDataEl, response.data);
+  // applyTextBindings(errorDataEl, response.data);
 }
 
-function getTestData(el) {
+function getTestData(el: HTMLElement): { data?: object, error?: object } | null {
   const testData = el.getAttribute('x-test-data');
   if (!testData) {
-    return;
+    return null;
   }
 
   try {
@@ -194,20 +196,20 @@ function getTestData(el) {
   }
 }
 
-async function fetchData(el, name) {
-  const url = el.getAttribute(name);
+async function fetchData(el: HTMLElement, name: string): Promise<{ data?: object | string, error?: object | boolean }> {
+  const url = el.getAttribute(name) as string;
   const method = XMethodMap[name];
   const customOptions = applyActions(el, "pre");
 
   const options = {
     method,
-    headers: customOptions.headers || {},
+    headers: customOptions['headers'] || {},
   };
   const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
   if (isWriteMethod) {
     const body = extractRequestBody(el);
     options.headers["Content-Type"] = "application/json";
-    options.body = JSON.stringify(body);
+    options['body'] = JSON.stringify(body);
   }
 
   try {
@@ -227,9 +229,9 @@ async function fetchData(el, name) {
   }
 }
 
-function showBySelector(el, selector) {
+function showBySelector(el: HTMLElement, selector: string): void {
   try {
-    const elem = el.querySelector(selector);
+    const elem = el.querySelector(selector) as HTMLElement | null;
     if (!elem) {
       return;
     }
@@ -242,9 +244,9 @@ function showBySelector(el, selector) {
   }
 }
 
-function hideBySelector(el, selector) {
+function hideBySelector(el: HTMLElement, selector: string): void {
   try {
-    const elem = el.querySelector(selector);
+    const elem = el.querySelector(selector) as HTMLElement | null;
     if (!elem) {
       return;
     }
@@ -255,8 +257,8 @@ function hideBySelector(el, selector) {
   }
 }
 
-function extractRequestBody(el) {
-  const formEl = resolveLocalAttrElem(el, 'x-submit');
+function extractRequestBody(el: HTMLElement): object {
+  const formEl = resolveLocalAttrElem(el, 'x-submit') as HTMLFormElement;
   if (formEl.tagName !== 'FORM') {
     return {};
   }
@@ -269,8 +271,8 @@ function extractRequestBody(el) {
   return obj;
 }
 
-function builtinPaginate(ctx) {
-  const el = ctx.el;
+function builtinPaginate(ctx: object): void {
+  const el = ctx['el'];
   const rawUrl = el.getAttribute("x-get");
   if (!rawUrl) {
     return;
@@ -294,7 +296,7 @@ function builtinPaginate(ctx) {
   el.setAttribute("x-get", newUrl);
 }
 
-function applyActions(el, phase, response) {
+function applyActions(el: HTMLElement, phase: 'pre' | 'post', response?: object): object {
   const actionAttrs = Array
     .from(el.attributes)
     .filter(attr => attr.name.startsWith("x-action-"));
@@ -315,12 +317,12 @@ function applyActions(el, phase, response) {
   }
 
   globalActions.forEach(fn => {
-    if (typeof fn !== 'function') {
-      console.warn(`[jtml] Registered global action is not a function:`, fn);
+    if (typeof fn[phase] !== 'function') {
+      console.warn(`[jtml] Registered global action has an invalid ${phase} function:`, fn);
       return;
     }
 
-    fn(ctx);
+    fn[phase]?.(ctx);
   });
 
   return ctx;
@@ -332,14 +334,12 @@ if (document.readyState !== "loading") {
   document.addEventListener("DOMContentLoaded", () => processJtmlElements(document.body));
 }
 
-window.jtml = {
+window['jtml'] = {
   render: processJtmlElements,
-  addGlobalAction: (fn) => {
-    if (typeof fn === "function") {
-      globalActions.push(fn);
-    }
+  addGlobalAction: (fn: HookFunction) => {
+    globalActions.push(fn);
   },
-  registerAction: (name, fn) => {
+  registerAction: (name: string, fn: HookFunction) => {
     if (!name.startsWith("user:")) {
       console.warn(`[jtml] Custom actions should be prefixed with "user:". Got "${name}".`);
     }

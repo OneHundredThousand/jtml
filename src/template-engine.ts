@@ -4,32 +4,32 @@ const actions = {
     },
 }
 
-function renderTemplate(template, response) {
-    const content = template.content.cloneNode(true);
+function renderTemplate(template: HTMLTemplateElement, response: object): HTMLElement {
+    const content = template.content.cloneNode(true) as HTMLElement;
 
     processElements(content, response);
 
     return content;
 }
 
-function processElements(content, response) {
+function processElements(content: HTMLElement, response: object): void {
     const foreachBlocks = content.children;
     if (!foreachBlocks) {
         return;
     }
 
-    for (let loopEl of foreachBlocks) {
+    for (const loopEl of foreachBlocks) {
         if (loopEl.hasAttribute("x-foreach")) {
-            processForeachBlocks(loopEl, response);
+            processForeachBlocks(loopEl as HTMLElement, response);
             continue;
         }
 
-        processElements(loopEl, response);
-        applyAttrBindings(loopEl, response);
+        processElements(loopEl as HTMLElement, response);
+        applyAttrBindings(loopEl as HTMLElement, response);
     }
 }
 
-function processForeachBlocks(el, response) {
+function processForeachBlocks(el: HTMLElement, response: object): void {
     const path = el.getAttribute("x-foreach");
     const loopData = path ? getNestedValue(response, path) : response;
 
@@ -41,7 +41,7 @@ function processForeachBlocks(el, response) {
     const cloneContainer = document.createDocumentFragment();
 
     loopData.forEach(item => {
-        const inner = el.cloneNode(true);
+        const inner = el.cloneNode(true) as HTMLElement;
         inner.removeAttribute("x-foreach");
 
         processElements(inner, item);
@@ -53,8 +53,12 @@ function processForeachBlocks(el, response) {
     el.replaceWith(cloneContainer);
 }
 
-function applyAttrBindings(fragment, data) {
-    const elements = fragment.parentNode.querySelectorAll("*");
+function applyAttrBindings(fragment: HTMLElement, data: object): void {
+    const elements = fragment.parentNode?.querySelectorAll("*");
+    if (!elements) {
+        return;
+    }
+
     for (const el of elements) {
         for (const attr of el.attributes) {
             console.log(attr);
@@ -86,7 +90,7 @@ function applyAttrBindings(fragment, data) {
     }
 }
 
-function getNestedValue(obj, path) {
+function getNestedValue(obj: object, path: string): any | null {
     return path
         .split('.')
         .reduce((o, key) => {
@@ -97,7 +101,7 @@ function getNestedValue(obj, path) {
         }, obj);
 }
 
-function interpolate(template, data) {
+function interpolate(template: string, data: object): string {
     let result = '';
     let i = 0;
 
