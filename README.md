@@ -53,12 +53,15 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
     </div>
   </template>
 </div>
-<script src="jtml.js"></script>
+<script src="jtml-min.js"></script>
 <!-- /posts returns [{ "name": "name" }] -->
 ```
 
+## 📚 Examples
+[Checkout examples!](https://onehundredthousand.github.io/jtml/)
+
 ## 🎮 Playground
-[🧪 Try it in the Playground!](https://onehundredthousand.github.io/jtml/)
+[🧪 Try it in the Playground!](https://onehundredthousand.github.io/jtml/playground.html)
 
 ## 🔧 How It Works
 
@@ -73,7 +76,7 @@ Instead of burying your UI in component jungle or JSX jungle gyms, `jtml` lets y
 Just drop it in:
 
 ```html
-<script src="jtml.js"></script>
+<script src="jtml-min.js"></script>
 ```
 
 ## 🌱 Philosophy
