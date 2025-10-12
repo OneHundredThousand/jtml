@@ -1,0 +1,20 @@
+{
+  "name": "jtml",
+  "version": "1.0.0",
+  "description": "**jtml** is a lightweight JavaScript micro-library inspired by [HTMX](https://htmx.org), but built for the JSON age. It brings HTML templating back to the front of frontend development—where it belongs.",
+  "main": "template.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "npx esbuild src/main.ts --bundle --minify --sourcemap --outfile=docs/jtml-min.js --target=es6 --format=iife",
+    "watch": "npx esbuild src/main.ts --bundle --sourcemap --outfile=docs/jtml-min.js --target=es6 --format=iife --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.25.5"
+  }
+}
