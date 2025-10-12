@@ -1,40 +1,40 @@
-const actions = {
-    'var': (param, data) => {
+const actions: { [name: string]: (param: string, data: object) => string } = {
+    'var': (param: string, data: object): string => {
         return interpolate(param, data);
     },
 }
 
-function renderTemplate(template: HTMLTemplateElement, response: object): HTMLElement {
-    const content = template.content.cloneNode(true) as HTMLElement;
+function renderTemplate(el: Element, response: object): Element {
+    const content = el.cloneNode(true) as Element;
 
     processElements(content, response);
 
     return content;
 }
 
-function processElements(content: HTMLElement, response: object): void {
+function processElements(content: Element, response: object): void {
     const foreachBlocks = content.children;
     if (!foreachBlocks) {
         return;
     }
 
     for (const loopEl of foreachBlocks) {
-        if (loopEl.hasAttribute("x-foreach")) {
-            processForeachBlocks(loopEl as HTMLElement, response);
+        if (loopEl.hasAttribute("jt-foreach")) {
+            processForeachBlocks(loopEl, response);
             continue;
         }
 
         processElements(loopEl as HTMLElement, response);
-        applyAttrBindings(loopEl as HTMLElement, response);
+        applyAttrBindings(loopEl, response);
     }
 }
 
-function processForeachBlocks(el: HTMLElement, response: object): void {
-    const path = el.getAttribute("x-foreach");
+function processForeachBlocks(el: Element, response: object): void {
+    const path = el.getAttribute("jt-foreach");
     const loopData = path ? getNestedValue(response, path) : response;
 
     if (!Array.isArray(loopData)) {
-        console.warn("x-foreach expected an array but got", loopData);
+        console.warn("jt-foreach expected an array but got", loopData);
         return;
     }
 
@@ -42,7 +42,7 @@ function processForeachBlocks(el: HTMLElement, response: object): void {
 
     loopData.forEach(item => {
         const inner = el.cloneNode(true) as HTMLElement;
-        inner.removeAttribute("x-foreach");
+        inner.removeAttribute("jt-foreach");
 
         processElements(inner, item);
 
@@ -53,44 +53,34 @@ function processForeachBlocks(el: HTMLElement, response: object): void {
     el.replaceWith(cloneContainer);
 }
 
-function applyAttrBindings(fragment: HTMLElement, data: object): void {
-    const elements = fragment.parentNode?.querySelectorAll("*");
-    if (!elements) {
-        return;
-    }
+function applyAttrBindings(el: Element, data: object): void {
+    for (const attr of el.attributes) {
+        if (!attr.name.startsWith("jt-")) {
+            continue;
+        }
 
-    for (const el of elements) {
-        for (const attr of el.attributes) {
-            console.log(attr);
-            if (!attr.name.startsWith("x-")) {
-                continue;
-            }
+        el.removeAttribute(attr.name);
 
-            el.removeAttribute(attr.name); // remove after processing
+        const [attrName, transformerName] = attr.name.slice(3).split(':');
+        const attrValue = attr.value;
+        const transformer = actions[transformerName];
 
-            const [attrName, transformerName] = attr.name.slice(2).split(':');
-            const attrValue = attr.value;
-            const transformer = actions[transformerName];
+        let value;
+        if (transformer) {
+            value = transformer(attrValue, data);
+        } else {
+            value = getNestedValue(data, attrValue);
+        }
 
-            let value;
-            if (transformer) {
-                value = transformer(attrValue, data);
-            } else {
-                value = getNestedValue(data, attrValue);
-            }
-
-            console.log(attrName, value);
-
-            if (attrName === 'text') {
-                el.textContent = value;
-            } else {
-                el.setAttribute(attrName, value);
-            }
+        if (attrName === 'text') {
+            el.textContent = value;
+        } else {
+            el.setAttribute(attrName, value);
         }
     }
 }
 
-function getNestedValue(obj: object, path: string): any | null {
+function getNestedValue(obj: Record<string, any>, path: string): any | null {
     return path
         .split('.')
         .reduce((o, key) => {

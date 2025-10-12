@@ -1,5 +1,7 @@
 (() => {
   var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
   var __getOwnPropSymbols = Object.getOwnPropertySymbols;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -15,6 +17,7 @@
       }
     return a;
   };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __async = (__this, __arguments, generator) => {
     return new Promise((resolve, reject) => {
       var fulfilled = (value) => {
@@ -42,8 +45,8 @@
       return interpolate(param, data);
     }
   };
-  function renderTemplate(template, response) {
-    const content = template.content.cloneNode(true);
+  function renderTemplate(el, response) {
+    const content = el.cloneNode(true);
     processElements(content, response);
     return content;
   }
@@ -53,7 +56,7 @@
       return;
     }
     for (const loopEl of foreachBlocks) {
-      if (loopEl.hasAttribute("x-foreach")) {
+      if (loopEl.hasAttribute("jt-foreach")) {
         processForeachBlocks(loopEl, response);
         continue;
       }
@@ -62,49 +65,40 @@
     }
   }
   function processForeachBlocks(el, response) {
-    const path = el.getAttribute("x-foreach");
+    const path = el.getAttribute("jt-foreach");
     const loopData = path ? getNestedValue(response, path) : response;
     if (!Array.isArray(loopData)) {
-      console.warn("x-foreach expected an array but got", loopData);
+      console.warn("jt-foreach expected an array but got", loopData);
       return;
     }
     const cloneContainer = document.createDocumentFragment();
     loopData.forEach((item) => {
       const inner = el.cloneNode(true);
-      inner.removeAttribute("x-foreach");
+      inner.removeAttribute("jt-foreach");
       processElements(inner, item);
       cloneContainer.appendChild(inner);
     });
     el.replaceWith(cloneContainer);
   }
-  function applyAttrBindings(fragment, data) {
-    var _a;
-    const elements = (_a = fragment.parentNode) == null ? void 0 : _a.querySelectorAll("*");
-    if (!elements) {
-      return;
-    }
-    for (const el of elements) {
-      for (const attr of el.attributes) {
-        console.log(attr);
-        if (!attr.name.startsWith("x-")) {
-          continue;
-        }
-        el.removeAttribute(attr.name);
-        const [attrName, transformerName] = attr.name.slice(2).split(":");
-        const attrValue = attr.value;
-        const transformer = actions[transformerName];
-        let value;
-        if (transformer) {
-          value = transformer(attrValue, data);
-        } else {
-          value = getNestedValue(data, attrValue);
-        }
-        console.log(attrName, value);
-        if (attrName === "text") {
-          el.textContent = value;
-        } else {
-          el.setAttribute(attrName, value);
-        }
+  function applyAttrBindings(el, data) {
+    for (const attr of el.attributes) {
+      if (!attr.name.startsWith("jt-")) {
+        continue;
+      }
+      el.removeAttribute(attr.name);
+      const [attrName, transformerName] = attr.name.slice(3).split(":");
+      const attrValue = attr.value;
+      const transformer = actions[transformerName];
+      let value;
+      if (transformer) {
+        value = transformer(attrValue, data);
+      } else {
+        value = getNestedValue(data, attrValue);
+      }
+      if (attrName === "text") {
+        el.textContent = value;
+      } else {
+        el.setAttribute(attrName, value);
       }
     }
   }
@@ -138,63 +132,190 @@
     return result;
   }
 
-  // src/main.ts
-  var XMethodMap = {
-    "x-get": "GET",
-    "x-post": "POST",
-    "x-put": "PUT",
-    "x-patch": "PATCH",
-    "x-delete": "DELETE"
-  };
-  var SupportedEvents = ["click", "submit", "input", "change"];
-  var builtInActions = {
-    paginate: {
-      post: builtinPaginate
-    }
-  };
+  // src/new-main.ts
+  var SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
+  var builtInActions = {};
   var actions2 = __spreadValues({}, builtInActions);
   var globalActions = [];
-  function processJtmlElements(elem = document.body) {
-    Object.keys(XMethodMap).forEach((attrName) => {
-      const targets = elem.querySelectorAll(`[${attrName}]`);
-      targets.forEach((requestEl) => {
-        setupRequestTrigger(requestEl, attrName);
-      });
+  function processJtmlElements(scope) {
+    scope.querySelectorAll("[jt-scope]").forEach((jtScope) => {
+      initRequesters(jtScope);
+      hideInitialUiMarkers(jtScope);
     });
-    hideInitialUiMarkers(elem);
   }
-  function hideInitialUiMarkers(root) {
-    root.querySelectorAll("[x-loading], [x-error]").forEach((el) => {
+  function initRequesters(scope) {
+    scope.querySelectorAll("form, a").forEach((requester) => {
+      const event = resolveEvent(requester);
+      const triggerEl = resolveAttrElem(scope, requester, event);
+      if (event === "jt-load") {
+        queueMicrotask(() => attachRequest(scope, requester));
+      } else {
+        triggerEl.addEventListener(event.substring(3), (e) => {
+          e.preventDefault();
+          attachRequest(scope, requester);
+        });
+      }
+    });
+  }
+  function hideInitialUiMarkers(scope) {
+    scope.querySelectorAll("[jt-loading], [jt-error], [jt-error-data]").forEach((el) => {
       el.style.display = "none";
     });
   }
-  function setupRequestTrigger(requestEl, attrName) {
-    const event = resolveTrigger(requestEl);
-    if (event) {
-      const { name, triggerEl } = event;
-      triggerEl.addEventListener(name, (e) => {
-        e.preventDefault();
-        attachRequest(requestEl, attrName);
-      });
-    } else {
-      attachRequest(requestEl, attrName);
+  function resolveEvent(requester) {
+    for (const attr of requester.attributes) {
+      if (!attr.name.startsWith("jt-")) {
+        continue;
+      }
+      if (!SupportedEvents.includes(attr.name)) {
+        continue;
+      }
+      return attr.name;
+    }
+    return getTriggerDefault(requester);
+  }
+  function getTriggerDefault(el) {
+    if (el.tagName === "FORM") {
+      return "jt-submit";
+    }
+    return "jt-click";
+  }
+  function resolveMethod(el) {
+    var _a;
+    if (el.tagName === "FORM") {
+      return ((_a = el.getAttribute("method")) == null ? void 0 : _a.toLowerCase()) || "get";
+    }
+    return "get";
+  }
+  function attachRequest(scope, requester) {
+    return __async(this, null, function* () {
+      const method = resolveMethod(requester);
+      const target = resolveAttrElem(scope, requester, "jt-target");
+      const loading = resolveSelector(scope, "[jt-loading]");
+      const error = resolveSelector(scope, "[jt-error]");
+      const errorData = resolveSelector(scope, "[jt-error-data]");
+      showElement(loading);
+      hideElement(error);
+      try {
+        const response = yield handleRequest(requester, method);
+        handleResponse(requester, response, target);
+      } catch (err) {
+        if (errorData && (err == null ? void 0 : err.body)) {
+          handleErrorData(err == null ? void 0 : err.body, errorData);
+          showElement(errorData);
+        } else if (error) {
+          showElement(error);
+        }
+      } finally {
+        hideElement(loading);
+      }
+    });
+  }
+  function handleRequest(requester, method) {
+    return __async(this, null, function* () {
+      const testData = requester.getAttribute("jt-test-data");
+      if (testData) {
+        return getTestData(requester);
+      }
+      return fetchData(requester, method);
+    });
+  }
+  function fetchData(requester, method) {
+    return __async(this, null, function* () {
+      const url = requester.getAttribute("action") || requester.getAttribute("href");
+      const customOptions = applyActions(requester, "pre");
+      const options = {
+        method,
+        headers: customOptions.headers || {}
+      };
+      const isWriteMethod = ["post", "put", "patch"].includes(method);
+      if (isWriteMethod) {
+        const body = extractRequestBody(requester);
+        options.headers = __spreadProps(__spreadValues({}, options.headers), { "Content-Type": "application/json" });
+        options.body = JSON.stringify(body);
+      }
+      try {
+        const res = yield fetch(url, options);
+        const body = yield getResponseBody(requester, res);
+        if (!res.ok) {
+          throw {
+            status: res.status,
+            body
+          };
+        }
+        return body;
+      } catch (error) {
+        console.error("[jtml] fetch failed:", url, error);
+        throw error;
+      }
+    });
+  }
+  function getResponseBody(requester, res) {
+    return __async(this, null, function* () {
+      const contentType = res.headers.get("Content-Type");
+      if (!contentType) {
+        return null;
+      }
+      if (requester.hasAttribute("jt-html")) {
+        return res.text();
+      }
+      return res.json();
+    });
+  }
+  function extractRequestBody(requester) {
+    if (requester.tagName !== "FORM") {
+      return {};
+    }
+    const formData = new FormData(requester);
+    const obj = {};
+    for (const [key, value] of formData.entries()) {
+      obj[key] = value;
+    }
+    return obj;
+  }
+  function getTestData(el) {
+    const testData = el.getAttribute("x-test-data");
+    if (!testData) {
+      return {};
+    }
+    try {
+      const data = JSON.parse(testData);
+      console.info("[jtml] Using x-test-data");
+      return data;
+    } catch (error) {
+      console.error("[jtml] Invalid x-test-data:", error);
+      throw error;
     }
   }
-  function resolveTrigger(el) {
-    for (const attr of el.attributes) {
-      if (!attr.name.startsWith("x-")) {
-        continue;
+  function handleResponse(requester, response, target) {
+    if (requester.hasAttribute("jt-html")) {
+      target.innerHTML = response;
+    } else {
+      const template = target.querySelector("template");
+      if (!template) {
+        return;
       }
-      const event = attr.name.slice(2);
-      if (!SupportedEvents.includes(event)) {
-        continue;
-      }
-      return {
-        name: event,
-        triggerEl: resolveLocalAttrElem(el, attr.name)
-      };
+      const renderedDom = renderTemplate(template.content, response);
+      target.innerHTML = "";
+      target.appendChild(renderedDom);
+      applyActions(requester, "post", response);
     }
-    return null;
+  }
+  function handleErrorData(response, target) {
+    const renderedDom = renderTemplate(target, response);
+    target.innerHTML = renderedDom.innerHTML;
+  }
+  function resolveAttrElem(scope, elem, attr) {
+    const selector = elem.getAttribute(attr);
+    if (!selector) {
+      return elem;
+    }
+    const triggerEl = resolveSelector(scope, selector);
+    if (!triggerEl) {
+      console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, scope);
+      return elem;
+    }
+    return triggerEl;
   }
   function resolveSelector(el, selector) {
     try {
@@ -208,194 +329,26 @@
       return null;
     }
   }
-  function resolveLocalAttrElem(elem, attr) {
-    const selector = elem.getAttribute(attr);
-    if (!selector) {
-      return elem;
-    }
-    const triggerEl = resolveSelector(elem, selector);
-    if (!triggerEl) {
-      console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, elem);
-      return elem;
-    }
-    return triggerEl;
-  }
-  function resolveScopedAttrElem(elem, attr) {
-    const selector = elem.getAttribute(attr);
-    if (!selector) {
-      return elem;
-    }
-    const triggerEl = resolveSelector(elem, selector);
-    if (!triggerEl) {
-      const scope = elem.closest("[x-scoped]");
-      if (!scope) {
-        console.warn(`[jtml] Selector '${selector}' from ${attr} not found in:`, elem);
-        return elem;
-      }
-      return resolveSelector(scope, selector);
-    }
-    return triggerEl;
-  }
-  function attachRequest(el, attrName) {
-    return __async(this, null, function* () {
-      const method = XMethodMap[attrName];
-      if (!method) {
-        return;
-      }
-      const target = resolveScopedAttrElem(el, "x-target");
-      showBySelector(el, "[x-loading]");
-      hideBySelector(el, "[x-error]");
-      hideBySelector(el, "[x-error-data]");
-      try {
-        const response = yield handleRequest(el, attrName);
-        handleResponse(el, response, target);
-      } catch (err) {
-        console.error("[jtml] fetch failed:", err);
-        showBySelector(el, "[x-error]");
-      } finally {
-        hideBySelector(el, "[x-loading]");
-      }
-    });
-  }
-  function handleRequest(el, attrName) {
-    return __async(this, null, function* () {
-      const testData = el.getAttribute("x-test-data");
-      if (testData) {
-        return getTestData(el);
-      }
-      return fetchData(el, attrName);
-    });
-  }
-  function handleResponse(el, response, target) {
-    if (response.error) {
-      handleErrors(el, response);
+  function showElement(el) {
+    if (!el) {
       return;
     }
-    if (el.hasAttribute("x-html")) {
-      target.innerHTML = response.data;
-      processJtmlElements(target);
-    } else {
-      const template = el.querySelector("template");
-      if (!template) {
-        return;
-      }
-      const renderedDom = renderTemplate(template, response.data);
-      target.innerHTML = "";
-      target.appendChild(renderedDom);
-      applyActions(el, "post", response.data);
+    if (el.style.display === "none") {
+      console.log(el.style.display);
+      el.style.display = "";
     }
   }
-  function handleErrors(el, response) {
-    const errorDataEl = el.querySelector("[x-error-data]");
-    if (!errorDataEl || !response.data) {
-      showBySelector(el, "[x-error]");
+  function hideElement(el) {
+    if (!el) {
       return;
     }
-    showBySelector(el, "[x-error-data]");
-  }
-  function getTestData(el) {
-    const testData = el.getAttribute("x-test-data");
-    if (!testData) {
-      return null;
-    }
-    try {
-      const data = JSON.parse(testData);
-      console.info("[jtml] Using x-test-data");
-      return { data };
-    } catch (error) {
-      console.error("[jtml] Invalid x-test-data:", error);
-      return { error };
-    }
-  }
-  function fetchData(el, name) {
-    return __async(this, null, function* () {
-      const url = el.getAttribute(name);
-      const method = XMethodMap[name];
-      const customOptions = applyActions(el, "pre");
-      const options = {
-        method,
-        headers: customOptions["headers"] || {}
-      };
-      const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
-      if (isWriteMethod) {
-        const body = extractRequestBody(el);
-        options.headers["Content-Type"] = "application/json";
-        options["body"] = JSON.stringify(body);
-      }
-      try {
-        const res = yield fetch(url, options);
-        const error = res.status >= 400;
-        if (el.hasAttribute("x-html")) {
-          const textData = yield res.text();
-          return { error, data: textData };
-        }
-        const jsonData = yield res.json();
-        return { error, data: jsonData };
-      } catch (error) {
-        console.error("[jtml] fetch failed:", url, error);
-        throw { error };
-      }
-    });
-  }
-  function showBySelector(el, selector) {
-    try {
-      const elem = el.querySelector(selector);
-      if (!elem) {
-        return;
-      }
-      if (elem.style.display === "none") {
-        elem.style.display = "";
-      }
-    } catch (e) {
-      console.warn(`[jtml] Invalid selector '${selector}' inside element:`, el);
-    }
-  }
-  function hideBySelector(el, selector) {
-    try {
-      const elem = el.querySelector(selector);
-      if (!elem) {
-        return;
-      }
-      elem.style.display = "none";
-    } catch (e) {
-      console.warn(`[jtml] Invalid selector '${selector}' inside element:`, el);
-    }
-  }
-  function extractRequestBody(el) {
-    const formEl = resolveLocalAttrElem(el, "x-submit");
-    if (formEl.tagName !== "FORM") {
-      return {};
-    }
-    const formData = new FormData(formEl);
-    const obj = {};
-    for (const [key, value] of formData.entries()) {
-      obj[key] = value;
-    }
-    return obj;
-  }
-  function builtinPaginate(ctx) {
-    const el = ctx["el"];
-    const rawUrl = el.getAttribute("x-get");
-    if (!rawUrl) {
-      return;
-    }
-    let url;
-    try {
-      url = new URL(rawUrl, window.location.href);
-    } catch (err) {
-      console.warn("[jtml] Invalid x-get URL for pagination:", rawUrl);
-      return;
-    }
-    const currentPage = parseInt(url.searchParams.get("page") || "1", 10);
-    url.searchParams.set("page", currentPage + 1);
-    const newUrl = url.origin === window.location.origin ? url.pathname + url.search : url.toString();
-    el.setAttribute("x-get", newUrl);
+    el.style.display = "none";
   }
   function applyActions(el, phase, response) {
-    const actionAttrs = Array.from(el.attributes).filter((attr) => attr.name.startsWith("x-action-"));
+    var _a;
+    const actionsNames = ((_a = el.getAttribute("jt-hook")) == null ? void 0 : _a.split(",")) || [];
     const ctx = { el, response };
-    for (const attr of actionAttrs) {
-      const name = attr.name.slice(9);
+    for (const name of actionsNames) {
       const action = actions2[name];
       const fn = action == null ? void 0 : action[phase];
       if (typeof fn !== "function") {
@@ -405,12 +358,12 @@
       fn(ctx);
     }
     globalActions.forEach((fn) => {
-      var _a;
+      var _a2;
       if (typeof fn[phase] !== "function") {
         console.warn(`[jtml] Registered global action has an invalid ${phase} function:`, fn);
         return;
       }
-      (_a = fn[phase]) == null ? void 0 : _a.call(fn, ctx);
+      (_a2 = fn[phase]) == null ? void 0 : _a2.call(fn, ctx);
     });
     return ctx;
   }
@@ -419,17 +372,18 @@
   } else {
     document.addEventListener("DOMContentLoaded", () => processJtmlElements(document.body));
   }
-  window["jtml"] = {
-    render: processJtmlElements,
-    addGlobalAction: (fn) => {
-      globalActions.push(fn);
-    },
-    registerAction: (name, fn) => {
-      if (!name.startsWith("user:")) {
-        console.warn(`[jtml] Custom actions should be prefixed with "user:". Got "${name}".`);
-      }
-      actions2[name] = fn;
+  function addGlobalAction(fn) {
+    globalActions.push(fn);
+  }
+  function registerAction(name, fn) {
+    if (!name.startsWith("user:")) {
+      console.warn(`[jtml] Custom actions should be prefixed with "user:". Got "${name}".`);
     }
+    actions2[name] = fn;
+  }
+  window.Jtml = {
+    addGlobalAction,
+    registerAction
   };
 })();
 //# sourceMappingURL=jtml-min.js.map

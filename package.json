@@ -8,8 +8,8 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node build.js",
-    "dev": "node build.js"
+    "build": "npx esbuild src/main.ts --bundle --minify --sourcemap --outfile=docs/jtml-min.js --target=es6 --format=iife",
+    "watch": "npx esbuild src/main.ts --bundle --sourcemap --outfile=docs/jtml-min.js --target=es6 --format=iife --watch"
   },
   "keywords": [],
   "author": "",
