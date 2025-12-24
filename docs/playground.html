@@ -32,20 +32,19 @@
 
     <form id="playground-form">
         <textarea id="code" name="code" rows="10" cols="80">
-  <!-- Type your jtml here -->
-  <div jt-scope>
-    <form action="https://dummyjson.com/users" jt-template="template" jt-target="#out"></form>
+<!-- Type your jtml here -->
+<div jt-scope>
+    <form action="https://dummyjson.com/users" jt-load jt-render="template" jt-target="#out"></form>
     <template>
-      <div x-foreach="users">
-          <img x-attr:src="image"></span>
-          <span x-text="firstName"></span>
-          <span x-text="age"></span>
-      </div>
-      <p>static text</p>
+        <div jt-foreach="users">
+            <img jt-attr:src="image">
+            <span jt-text="firstName"></span>
+            <span jt-text="age"></span>
+        </div>
     </template>
     <div id="out"></div>
-  </div>
-    </textarea>
+</div>
+        </textarea>
         <br />
         <button id="run-btn" type="submit">Run</button>
         <button id="share-btn" type="submit">Share</button>
