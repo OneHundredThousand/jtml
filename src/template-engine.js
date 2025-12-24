@@ -47,7 +47,7 @@ function compileBind(node) {
         if (attr.name.startsWith("jt-attr:")) {
             const [, realAttr] = attr.name.split(":");
             binders.push((el, ctx) => {
-                el.setAttribute(realAttr, ctx[attr.value]);
+                el.setAttribute(realAttr, evalVariables(ctx, attr.value));
             });
         }
     }
