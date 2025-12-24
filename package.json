@@ -10,7 +10,7 @@
         "test": "echo \"Error: no test specified\" && exit 1",
         "build": "npx esbuild src/main.js --bundle --minify --sourcemap --outfile=build.js --target=es6 --format=iife",
         "watch": "npx esbuild src/main.js --bundle --sourcemap --outfile=build.js --target=es6 --format=iife --watch",
-        "terser": "terser build.js -o main-min.js -c -m"
+        "terser": "terser build.js -o jtml-min.js -c -m"
     },
     "keywords": [],
     "author": "",
