@@ -1,27 +1,16 @@
 export function compileTemplate(template) {
     const isTemplate = template instanceof HTMLTemplateElement;
-    if (isTemplate) {
-        const tpl = template.content;
-        const renderers = Array.from(tpl.childNodes).map(createRenderer).filter(Boolean);
 
-        return function (data) {
-            const frag = document.createDocumentFragment();
-            for (const renderer of renderers) {
-                const node = renderNode(renderer, data);
-                if (node) frag.appendChild(node);
-            }
+    const renderers = Array.from(isTemplate ? template.content.childNodes : template.children).map(createRenderer).filter(Boolean);
 
-            return frag;
-        };
-    }
-
-    const renderers = Array.from(template.children).map(createRendererStatic);
     return function (data) {
+        const frag = isTemplate ? document.createDocumentFragment() : null;
         for (const renderer of renderers) {
-            renderNodeStatic(renderer, data);
+            const node = renderNode(renderer, data, isTemplate);
+            if (isTemplate && node) frag.appendChild(node);
         }
 
-        return null;
+        return frag;
     };
 }
 
@@ -39,8 +28,8 @@ function createRenderer(node) {
         return null;
     }
 
-    const foreach = node.getAttribute('jt-foreach');
-    const text = node.getAttribute('jt-text');
+    const foreach = node.getAttribute("jt-foreach");
+    const text = node.getAttribute("jt-text");
 
     const binders = compileBind(node);
 
@@ -49,15 +38,6 @@ function createRenderer(node) {
     const children = Array.from(node.childNodes).map(createRenderer).filter(Boolean);
 
     return { type: "element", node, foreach, text, ifExpr, binders, children };
-}
-
-function createRendererStatic(node) {
-    const text = node.getAttribute('jt-text');
-    const binders = compileBind(node);
-
-    const children = Array.from(node.children).map(createRendererStatic);
-
-    return { node, text, binders, children };
 }
 
 function compileBind(node) {
@@ -76,7 +56,7 @@ function compileBind(node) {
 }
 
 function compileIf(node) {
-    const xif = node.getAttribute('jt-if');
+    const xif = node.getAttribute("jt-if");
     if (!xif) {
         return null;
     }
@@ -93,30 +73,29 @@ function compileIf(node) {
     const [left, op, rightRaw] = xif.trim().split(/\s+/);
     const opFn = ops[op];
 
-    if (!opFn) throw new Error("Unknown operator: " + op);
+    if (!opFn) {
+        throw new Error("Unknown operator: " + op);
+    }
 
-    // pre-resolve right-hand literal
     let rightVal;
     if (/^'.*'$/.test(rightRaw)) {
-        rightVal = rightRaw.slice(1, -1); // remove quotes
+        rightVal = rightRaw.slice(1, -1);
     } else if (!isNaN(Number(rightRaw))) {
         rightVal = Number(rightRaw);
     } else {
-        // right might be a variable too
         rightVal = (ctx) => ctx[rightRaw];
     }
 
     const leftAccessor = (ctx) => ctx[left];
 
-    // Now build a NO-STRING closure
-    return function (ctx) {
+    return (ctx) => {
         const leftValue = leftAccessor(ctx);
         const rightValue = typeof rightVal === "function" ? rightVal(ctx) : rightVal;
         return opFn(leftValue, rightValue);
     };
 }
 
-function renderNode(renderer, context) {
+function renderNode(renderer, context, isTemplate) {
     const { type, node, foreach, text, ifExpr, binders, children } = renderer;
 
     if (type === "text") {
@@ -128,35 +107,42 @@ function renderNode(renderer, context) {
     }
 
     if (foreach) {
-        const items = foreach !== '.' ? context[foreach] : context;
+        const items = evalVariables(context, foreach);
 
-        if (!Array.isArray(items)) return null;
+        if (!Array.isArray(items)) {
+            return null;
+        }
 
         const frag = document.createDocumentFragment();
         for (const item of items) {
             const clone = node.cloneNode(false);
-            clone.removeAttribute('jt-foreach');
+            clone.removeAttribute("jt-foreach");
+
             for (const childRenderer of children) {
                 const childNode = renderNode(childRenderer, item);
-                if (childNode) clone.appendChild(childNode);
+                if (childNode) {
+                    clone.appendChild(childNode);
+                }
             }
+
             frag.appendChild(clone);
         }
         return frag;
     }
 
-    const clone = node.cloneNode(false);
-    const ctx = text && text !== '.' ? evalVariables(context, text) : context;
-    if (text && ctx) {
-        clone.textContent = ctx;
+    const clone = isTemplate ? node.cloneNode(false) : node;
+    if (text) {
+        const val = evalVariables(context, text);
+        if (val) {
+            clone.textContent = val;
+        }
     }
 
-    // jt-bind
-    binders.forEach((fn) => fn(clone, ctx));
+    binders.forEach((fn) => fn(clone, context));
 
     for (const childRenderer of children) {
-        const childNode = renderNode(childRenderer, context);
-        if (childNode) {
+        const childNode = renderNode(childRenderer, context, isTemplate);
+        if (isTemplate && childNode) {
             clone.appendChild(childNode);
         }
     }
@@ -164,68 +150,59 @@ function renderNode(renderer, context) {
     return clone;
 }
 
-function renderNodeStatic(renderer, context) {
-    const { node, text, binders, children } = renderer;
-
-    const ctx = text && text !== '.' ? evalVariables(context, text) : context;
-    if (text && ctx) {
-        node.textContent = ctx;
+function evalVariables(context, name) {
+    if (name === ".") {
+        return context;
     }
 
-    // jt-bind
-    binders.forEach((fn) => fn(node, ctx));
-
-    for (const childRenderer of children) {
-        renderNodeStatic(childRenderer, context);
-    }
-}
-
-function evalVariables(context, text) {
-    console.log(text, context);
-    const val = getNestedValue(context, text);
+    const val = getNestedValue(context, name);
     if (val) {
         return val;
     }
-    return interpolate(text, context);
+
+    return interpolate(name, context);
 }
 
 function getNestedValue(obj, path) {
     let current = obj;
-    for (let i = 0, keys = path.split('.'); i < keys.length; i++) {
-        if (current == null) return undefined;
+    for (let i = 0, keys = path.split("."); i < keys.length; i++) {
+        if (current == null) {
+            return undefined;
+        }
+
         current = current[keys[i]];
     }
+
     return current;
 }
 
 function interpolate(template, data) {
-    let result = '';
+    let result = "";
     let i = 0;
 
     while (i < template.length) {
-        const start = template.indexOf('{{', i);
+        const start = template.indexOf("{{", i);
 
         if (start === -1) {
-            result += template.slice(i); // Append remaining text
+            result += template.slice(i);
             break;
         }
 
-        result += template.slice(i, start); // Append text before {{
-        const end = template.indexOf('}}', start);
+        result += template.slice(i, start);
 
+        const end = template.indexOf("}}", start);
         if (end === -1) {
-            result += template.slice(start); // No matching }} — treat as raw
+            result += template.slice(start);
             break;
         }
 
         const key = template
             .slice(start + 2, end)
-            .trim(); // Extract the key inside {{ }}
+            .trim();
 
-        result += getNestedValue(data, key); // Interpolate or empty
-        i = end + 2; // Move past the }}
+        result += getNestedValue(data, key);
+        i = end + 2;
     }
 
     return result;
-}
-
+} // 261
