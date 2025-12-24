@@ -119,7 +119,7 @@ function renderNode(renderer, context, isTemplate) {
             clone.removeAttribute("jt-foreach");
 
             for (const childRenderer of children) {
-                const childNode = renderNode(childRenderer, item);
+                const childNode = renderNode(childRenderer, item, isTemplate);
                 if (childNode) {
                     clone.appendChild(childNode);
                 }
