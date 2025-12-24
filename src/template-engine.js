@@ -17,7 +17,7 @@ export function compileTemplate(template) {
 function createRenderer(node) {
     if (node.nodeType === Node.TEXT_NODE) {
         const raw = node.textContent;
-        if (!raw.trim()) {
+        if (!raw || !raw.length) {
             return null;
         }
 
