@@ -1,0 +1,95 @@
+<!-- docs/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>jtml Playground</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 1rem;
+        }
+
+        .card {
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            background: #f2f2f2;
+            border-radius: 4px;
+        }
+
+        code {
+            background: #eee;
+            padding: 0.2rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🎮 jtml Playground</h1>
+    <p>This is a live example.</p>
+
+    <form id="playground-form">
+        <textarea id="code" name="code" rows="10" cols="80">
+  <!-- Type your jtml here -->
+  <div jt-scope>
+    <form action="https://dummyjson.com/users" jt-template="template" jt-target="#out"></form>
+    <template>
+      <div x-foreach="users">
+          <img x-attr:src="image"></span>
+          <span x-text="firstName"></span>
+          <span x-text="age"></span>
+      </div>
+      <p>static text</p>
+    </template>
+    <div id="out"></div>
+  </div>
+    </textarea>
+        <br />
+        <button id="run-btn" type="submit">Run</button>
+        <button id="share-btn" type="submit">Share</button>
+    </form>
+
+    <hr />
+
+    <h2>Output:</h2>
+    <div id="playground-output"></div>
+
+    <p style="font-size: 0.8rem; color: #888;">Try it!</p>
+
+    <script src="jtml-min.js"></script>
+    <script>
+        const textarea = document.getElementById("code");
+        const playgroundOutput = document.getElementById("playground-output");
+        const runBtn = document.getElementById("run-btn");
+        const shareBtn = document.getElementById("share-btn");
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.has("code")) {
+            const code = decodeURIComponent(params.get("code"));
+            textarea.value = code;
+        }
+
+        function renderPreview(html) {
+            playgroundOutput.innerHTML = html;
+            JTML.apply(playgroundOutput); // ← run your library
+        }
+
+        runBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const html = textarea.value;
+            renderPreview(html);
+        });
+
+        shareBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const html = textarea.value;
+            const encoded = encodeURIComponent(html);
+            const newUrl = `${window.location.pathname}?code=${encoded}`;
+            history.replaceState(null, "", newUrl);
+        });
+    </script>
+</body>
+
+</html>
