@@ -4,78 +4,64 @@ const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-l
 
 const JTML = {
     apply: function (root = document) {
-        const scopes = root.querySelectorAll("[jt-scope]");
+        measure(() => {
+            const scopes = root.querySelectorAll("[jt-scope]");
 
-        scopes.forEach(scope => {
-            console.log("Processing JTML scope:", scope);
-
-            // actors
-            // pipelines
-            // decorator
-
-            const context = window[scope.getAttribute("jt-scope")]?.();
-
-            // can be condensed to actors
-
-            // Find forms and anchors within this scope
-            const forms = scope.querySelectorAll("form");
-            const anchors = scope.querySelectorAll("a");
-
-            // Set defaults and bind events for forms
-            forms.forEach(form => setupFormRequester(scope, form));
-
-            anchors.forEach(anchor => setupAnchorRequester(scope, anchor));
-
-            bindEvents(scope, context);
+            for (const scope of scopes) {
+                JTML.bindDom(scope);
+            }
         });
     },
-};
 
-// separate forms and anchors handlers
-function setupFormRequester(scope, requester) {
-    const triggers = requester.querySelectorAll("[jt-submit-form]");
+    bindDom: function (scope, el = scope) {
+        console.log("Processing JTML el:", el);
 
-    const renderer = getRenderer(scope, requester);
+        // actors
+        // pipelines
+        // decorator
 
-    const cb = evt => {
-        if (evt) {
-            evt.preventDefault();
+        const context = window[el.getAttribute("jt-scope")]?.();
+
+        const actors = el.querySelectorAll(`form,a,[${SupportedEvents.join("],[")}]`);
+
+        for (const actor of actors) {
+            if (actor._redered) {
+                continue;
+            }
+            switch (actor.tagName) {
+                case "FORM":
+                    setupRequester(scope, actor, 'submit');
+                    break
+                case "A":
+                    setupRequester(scope, actor, 'click');
+                    break
+                default:
+                    bindEvents(scope, actor, context);
+                    break;
+            }
+            actor._redered = true;
         }
-
-        jtRequester(scope, requester, renderer);
-    };
-
-    const onload = requester.hasAttribute("jt-load");
-    if (onload) {
-        cb();
     }
-
-    requester.addEventListener("submit", cb);
-
-    triggers.forEach(triggerEl => {
-        const event = triggerEl.getAttribute("jt-submit-form");
-        triggerEl.addEventListener(event, cb);
-    });
 };
 
-function setupAnchorRequester(scope, requester) {
-    const renderer = getRenderer(scope, requester);
+function setupRequester(scope, actor, defaultEvent) {
+    const renderer = getRenderer(scope, actor);
 
     const cb = (evt) => {
         if (evt) {
             evt.preventDefault();
         }
 
-        jtRequester(scope, requester, renderer);
+        jtRequester(scope, actor, renderer);
     };
 
-    const onload = requester.hasAttribute("jt-load");
+    const onload = actor.hasAttribute("jt-load");
     if (onload) {
         cb();
     }
 
-    requester.addEventListener("click", cb);
-};
+    actor.addEventListener(defaultEvent, cb);
+}
 
 function getRenderer(scope, requester) {
     const swapper = getSwapper(requester);
@@ -101,6 +87,8 @@ function getRenderer(scope, requester) {
         }
 
         swapper(target, dom);
+
+        JTML.bindDom(scope, target);
     }
 }
 
@@ -203,31 +191,22 @@ async function jtRequester(scope, requester, renderer) {
     }
 };
 
-function bindEvents(scope, context) {
-    const els = scope.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
+function bindEvents(scope, el, context) {
+    for (const jtEvent of SupportedEvents) {
+        const attr = el.getAttribute(jtEvent);
 
-    for (const el of els) {
-        for (const jtEvent of SupportedEvents) {
-
-            if (el.tagName === "FORM" || el.tagName === "A") {
-                continue;
-            }
-
-            if (!el.hasAttribute(jtEvent)) {
-                continue;
-            }
-
-            const attr = el.getAttribute(jtEvent);
-
-            const renderer = getRenderer(scope, el);
-
-            if (jtEvent === "jt-load") {
-                eventCb(el, attr, renderer, context);
-                continue;
-            }
-
-            el.addEventListener(getEventName(jtEvent), (e) => eventCb(el, attr, renderer, context, e));
+        if (attr === null) {
+            continue;
         }
+
+        const renderer = getRenderer(scope, el);
+
+        if (jtEvent === "jt-load") {
+            eventCb(el, attr, renderer, context);
+            continue;
+        }
+
+        el.addEventListener(getEventName(jtEvent), (e) => eventCb(el, attr, renderer, context, e));
     }
 };
 
@@ -260,7 +239,6 @@ function getFetchOptions(requester) {
 
     const isWriteMethod = ["post", "put", "patch"].includes(method);
     if (isWriteMethod) {
-        // @TODO let content-type be customizable?
         const body = extractRequestBody(requester);
         options.body = JSON.stringify(body);
 
