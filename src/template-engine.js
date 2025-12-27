@@ -1,7 +1,7 @@
 export function compileTemplate(template) {
     const isTemplate = template instanceof HTMLTemplateElement;
 
-    const renderers = Array.from(isTemplate ? template.content.childNodes : template.children).map(createRenderer).filter(Boolean);
+    const renderers = createRenderers(isTemplate ? template.content.childNodes : template.children);
 
     return function (data) {
         const frag = isTemplate ? document.createDocumentFragment() : null;
@@ -12,6 +12,20 @@ export function compileTemplate(template) {
 
         return frag;
     };
+}
+
+function createRenderers(tmpls) {
+    const renders = new Array(tmpls.length);
+    for (let i = 0; i < tmpls.length; i++) {
+        const renderer = createRenderer(tmpls[i]);
+        if (!renderer) {
+            continue;
+        }
+
+        renders[i] = renderer;
+    }
+
+    return renders;
 }
 
 function createRenderer(node) {
@@ -35,7 +49,7 @@ function createRenderer(node) {
 
     const ifExpr = compileIf(node);
 
-    const children = Array.from(node.childNodes).map(createRenderer).filter(Boolean);
+    const children = createRenderers(node.childNodes);
 
     return { type: "element", node, foreach, text, ifExpr, binders, children };
 }
@@ -116,7 +130,6 @@ function renderNode(renderer, context, isTemplate) {
         const frag = document.createDocumentFragment();
         for (const item of items) {
             const clone = node.cloneNode(false);
-            clone.removeAttribute("jt-foreach");
 
             for (const childRenderer of children) {
                 const childNode = renderNode(childRenderer, item, isTemplate);
@@ -138,7 +151,9 @@ function renderNode(renderer, context, isTemplate) {
         }
     }
 
-    binders.forEach((fn) => fn(clone, context));
+    for (const fn of binders) {
+        fn(clone, context);
+    }
 
     for (const childRenderer of children) {
         const childNode = renderNode(childRenderer, context, isTemplate);

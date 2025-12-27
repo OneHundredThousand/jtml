@@ -8,9 +8,11 @@
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "build": "npx esbuild src/main.js --bundle --minify --sourcemap --outfile=build.js --target=es6 --format=iife",
-        "watch": "npx esbuild src/main.js --bundle --sourcemap --outfile=build.js --target=es6 --format=iife --watch",
-        "terser": "terser build.js -o jtml-min.js -c -m"
+        "build": "npx esbuild src/main.js --bundle --minify --sourcemap --outfile=${BUILD_OUT:-.}/build.js --target=es6 --format=iife",
+        "watch": "npx esbuild src/main.js --bundle --sourcemap --outfile=${BUILD_OUT:-.}/build.js --target=es6 --format=iife --watch",
+        "terser": "terser ${TERSER_IN:-.}/build.js -o ${TERSER_OUT:-.}/jtml-min.js -c -m",
+        "dev": "concurrently 'BUILD_OUT=dev npm run watch' 'npx serve ./dev'",
+        "update-doc": "BUILD_OUT=docs npm run build && TERSER_IN=docs TERSER_OUT=docs npm run terser"
     },
     "keywords": [],
     "author": "",
@@ -19,6 +21,8 @@
         "esbuild": "^0.25.5"
     },
     "dependencies": {
+        "concurrently": "^9.2.1",
+        "serve": "^14.2.5",
         "terser": "^5.44.1"
     }
 }
