@@ -3,14 +3,12 @@ import * as utils from "./template-engine.js";
 const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
 
 const JTML = {
-    apply: function (root = document) {
-        measure(() => {
-            const scopes = root.querySelectorAll("[jt-scope]");
+    apply: function (root = document.body) {
+        const scopes = root.querySelectorAll("[jt-scope]");
 
-            for (const scope of scopes) {
-                JTML.bindDom(scope);
-            }
-        });
+        for (const scope of scopes) {
+            JTML.bindDom(scope);
+        }
     },
 
     bindDom: function (scope, el = scope) {
