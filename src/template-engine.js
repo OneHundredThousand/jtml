@@ -1,7 +1,7 @@
 export function compileTemplate(template) {
     const isTemplate = template instanceof HTMLTemplateElement;
 
-    const renderers = createRenderers(isTemplate ? template.content.childNodes : template.children);
+    const renderers = createRenderers(isTemplate ? template.content.childNodes : [template]);
 
     return function (data) {
         const frag = isTemplate ? document.createDocumentFragment() : null;
@@ -15,14 +15,14 @@ export function compileTemplate(template) {
 }
 
 function createRenderers(tmpls) {
-    const renders = new Array(tmpls.length);
-    for (let i = 0; i < tmpls.length; i++) {
-        const renderer = createRenderer(tmpls[i]);
+    const renders = [];
+    for (const tmpl of tmpls) {
+        const renderer = createRenderer(tmpl);
         if (!renderer) {
             continue;
         }
 
-        renders[i] = renderer;
+        renders.push(renderer);
     }
 
     return renders;
@@ -43,7 +43,7 @@ function createRenderer(node) {
     }
 
     const foreach = node.getAttribute("jt-foreach");
-    const text = node.getAttribute("jt-text");
+    const text = compileInterpolation(node.getAttribute("jt-text"));
 
     const binders = compileBind(node);
 
@@ -60,8 +60,10 @@ function compileBind(node) {
     for (let attr of node.attributes) {
         if (attr.name.startsWith("jt-attr:")) {
             const [, realAttr] = attr.name.split(":");
+
+            const text = compileInterpolation(attr.value);
             binders.push((el, ctx) => {
-                el.setAttribute(realAttr, evalVariables(ctx, attr.value));
+                el.setAttribute(realAttr, text(ctx));
             });
         }
     }
@@ -109,6 +111,88 @@ function compileIf(node) {
     };
 }
 
+function compileInterpolation(template) {
+    if (!template?.length) {
+        return;
+    }
+
+    const ast = [];
+    const len = template.length;
+
+    let i = 0;
+    let textStart = 0;
+
+    while (i < len) {
+        if (template[i] !== "{") {
+            i++;
+            continue;
+        }
+
+        // flush text before "{"
+        if (i > textStart) {
+            ast.push({
+                type: "text",
+                value: template.slice(textStart, i)
+            });
+        }
+
+        const exprStart = i + 1;
+        let j = exprStart;
+
+        while (j < len && template[j] !== "}") {
+            j++;
+        }
+
+        // unmatched "{"
+        if (j === len) {
+            ast.push({
+                type: "text",
+                value: template.slice(i)
+            });
+            return ast;
+        }
+
+        ast.push({
+            type: "path",
+            value: template.slice(exprStart, j)
+        });
+
+        i = j + 1;
+        textStart = i;
+    }
+
+    // trailing text
+    if (textStart < len) {
+        ast.push({
+            type: "text",
+            value: template.slice(textStart)
+        });
+    }
+
+    return (ctx) => {
+        let out = "";
+
+        if (ast.length === 1) {
+            const val = getNestedValue(ctx, ast[0].value);
+            out += val ? String(val) : ast[0].value;
+        } else {
+            for (const node of ast) {
+                if (node.type === "text") {
+                    out += node.value;
+                    continue;
+                }
+
+                if (node.type === "path") {
+                    const val = getNestedValue(ctx, node.value);
+                    out += val ? String(val) : node.value;
+                }
+            }
+        }
+
+        return out;
+    };
+}
+
 function renderNode(renderer, context, isTemplate) {
     const { type, node, foreach, text, ifExpr, binders, children } = renderer;
 
@@ -121,8 +205,7 @@ function renderNode(renderer, context, isTemplate) {
     }
 
     if (foreach) {
-        const items = evalVariables(context, foreach);
-
+        const items = getNestedValue(context, foreach);
         if (!Array.isArray(items)) {
             return null;
         }
@@ -133,7 +216,7 @@ function renderNode(renderer, context, isTemplate) {
 
             for (const childRenderer of children) {
                 const childNode = renderNode(childRenderer, item, isTemplate);
-                if (childNode) {
+                if (isTemplate && childNode) {
                     clone.appendChild(childNode);
                 }
             }
@@ -145,7 +228,7 @@ function renderNode(renderer, context, isTemplate) {
 
     const clone = isTemplate ? node.cloneNode(false) : node;
     if (text) {
-        const val = evalVariables(context, text);
+        const val = text(context);
         if (val) {
             clone.textContent = val;
         }
@@ -165,59 +248,16 @@ function renderNode(renderer, context, isTemplate) {
     return clone;
 }
 
-function evalVariables(context, name) {
-    if (name === ".") {
-        return context;
-    }
-
-    const val = getNestedValue(context, name);
-    if (val) {
-        return val;
-    }
-
-    return interpolate(name, context);
-}
-
-function getNestedValue(obj, path) {
+function getNestedValue(obj, paths) {
     let current = obj;
-    for (let i = 0, keys = path.split("."); i < keys.length; i++) {
-        if (current == null) {
+    for (const path of paths.split('.')) {
+        if (!current) {
             return undefined;
         }
 
-        current = current[keys[i]];
+        current = current[path];
     }
 
     return current;
 }
-
-function interpolate(template, data) {
-    let result = "";
-    let i = 0;
-
-    while (i < template.length) {
-        const start = template.indexOf("{{", i);
-
-        if (start === -1) {
-            result += template.slice(i);
-            break;
-        }
-
-        result += template.slice(i, start);
-
-        const end = template.indexOf("}}", start);
-        if (end === -1) {
-            result += template.slice(start);
-            break;
-        }
-
-        const key = template
-            .slice(start + 2, end)
-            .trim();
-
-        result += getNestedValue(data, key);
-        i = end + 2;
-    }
-
-    return result;
-} // 261
+// 261, 223

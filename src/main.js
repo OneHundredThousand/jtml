@@ -10,7 +10,6 @@ const JTML = {
             JTML.bindDom(scope);
         }
     },
-
     bindDom: function (scope, el = scope) {
         console.log("Processing JTML el:", el);
 
@@ -19,61 +18,81 @@ const JTML = {
         // decorator
 
         const context = window[el.getAttribute("jt-scope")]?.();
-
-        const actors = el.querySelectorAll(`form,a,[${SupportedEvents.join("],[")}]`);
+        const actors = el.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
 
         for (const actor of actors) {
             if (actor._redered) {
                 continue;
             }
-            switch (actor.tagName) {
-                case "FORM":
-                    setupRequester(scope, actor, 'submit');
-                    break
-                case "A":
-                    setupRequester(scope, actor, 'click');
-                    break
-                default:
-                    bindEvents(scope, actor, context);
-                    break;
-            }
+
+            bindEvents(scope, actor, context);
             actor._redered = true;
         }
-    }
+    },
 };
 
-function setupRequester(scope, actor, defaultEvent) {
-    const renderer = getRenderer(scope, actor);
+function bindEvents(scope, el, context) {
+    const source = resolveElFromAttr(scope, el, 'jt-source') || el;
+    const renderer = getRenderer(scope, el);
 
-    const cb = (evt) => {
-        if (evt) {
-            evt.preventDefault();
+    for (const jtEvent of SupportedEvents) {
+        const eventVal = el.getAttribute(jtEvent);
+
+        if (eventVal === null) {
+            continue;
         }
 
-        jtRequester(scope, actor, renderer);
-    };
+        if (jtEvent === "jt-load") {
+            handleEvent(scope, el, eventVal, renderer, context, source);
+            continue;
+        }
 
-    const onload = actor.hasAttribute("jt-load");
-    if (onload) {
-        cb();
+        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(scope, el, eventVal, renderer, context, source, evt));
+    }
+}
+
+async function handleEvent(scope, el, eventVal, renderer, context, source, evt) {
+    evt?.preventDefault?.();
+
+    const fn = window[eventVal];
+
+    const res = fn?.constructor?.name === "AsyncFunction" ? await fn(el, evt) : fn?.(el, evt);
+    if (res === false) {
+        return;
     }
 
-    actor.addEventListener(defaultEvent, cb);
+    let data = context;
+    if (source.tagName === 'FORM' || source.tagName === 'A') {
+        const response = await jtRequester(scope, source);
+        if (!response) {
+            return;
+        }
+        if (el.hasAttribute('jt-html')) {
+            data = response;
+        } else {
+            data = { ...data, ...response };
+        }
+    }
+
+    renderer(data);
 }
 
 function getRenderer(scope, requester) {
-    const swapper = getSwapper(requester);
-
     let compiledTemplate;
 
-    const target = resolveElFromAttr(scope, requester, "jt-target");
-
-    const template = resolveElFromAttr(scope, requester, "jt-render");
+    const template = !requester.hasAttribute('jt-html') ? resolveElFromAttr(scope, requester, "jt-render") || requester : null;
     if (template) {
+        if (template._renderer) {
+            return template._renderer;
+        }
+
         compiledTemplate = utils.compileTemplate(template);
     }
 
-    return (data) => {
+    const target = resolveElFromAttr(scope, requester, "jt-target") || requester;
+    const swapper = getSwapper(requester);
+
+    const renderer = (data) => {
         let dom = data;
 
         if (compiledTemplate) {
@@ -88,43 +107,28 @@ function getRenderer(scope, requester) {
 
         JTML.bindDom(scope, target);
     }
+
+    if (template) {
+        template._renderer = renderer;
+    }
+
+    return renderer;
 }
 
 function getSwapper(el) {
+    const DOMSwappers = {
+        replace: (target, dom) => target.replaceChildren(dom),
+        append: (target, dom) => target.appendChild(dom),
+        prepend: (target, dom) => target.prepend(dom),
+    };
+    const StringSwappers = {
+        replace: (target, domStr) => target.innerHTML = domStr,
+        append: (target, domStr) => target.innerHTML += domStr,
+        prepend: (target, domStr) => target.innerHTML = domStr + target.innerHTML,
+    };
     const swapType = el.getAttribute('jt-swap') || 'replace';
-    const isJtHtml = el.hasAttribute('jt-html');
-    switch (swapType) {
-        case "replace":
-            return getReplacer(isJtHtml);
-        case "append":
-            return getAppender(isJtHtml);
-        case "prepend":
-            return getPrepender(isJtHtml);
-    }
-}
-
-function getReplacer(isJtHtml) {
-    if (isJtHtml) {
-        return (target, domStr) => target.innerHTML = domStr;
-    }
-
-    return (target, dom) => target.replaceChildren(dom);
-}
-
-function getAppender(isJtHtml) {
-    if (isJtHtml) {
-        return (target, domStr) => target.innerHTML += domStr;
-    }
-
-    return (target, dom) => target.appendChild(dom);
-}
-
-function getPrepender(isJtHtml) {
-    if (isJtHtml) {
-        return (target, domStr) => target.innerHTML = domStr + target.innerHTML;
-    }
-
-    return (target, dom) => target.prepend(dom);
+    const swapperStrategy = el.hasAttribute('jt-html') ? StringSwappers : DOMSwappers;
+    return swapperStrategy[swapType];
 }
 
 async function httpRequest(requester) {
@@ -166,7 +170,7 @@ async function httpRequest(requester) {
     }
 }
 
-async function jtRequester(scope, requester, renderer) {
+async function jtRequester(scope, requester) {
     const loadingEl = resolveElFromAttr(scope, requester, "jt-loading");
     const errorEl = resolveElFromAttr(scope, requester, "jt-error");
 
@@ -179,7 +183,7 @@ async function jtRequester(scope, requester, renderer) {
         hideElement(loadingEl);
         hideElement(errorEl);
 
-        renderer(data);
+        return data;
 
     } catch (err) {
         hideElement(loadingEl);
@@ -187,43 +191,6 @@ async function jtRequester(scope, requester, renderer) {
 
         console.error("Form request failed:", err);
     }
-};
-
-function bindEvents(scope, el, context) {
-    for (const jtEvent of SupportedEvents) {
-        const attr = el.getAttribute(jtEvent);
-
-        if (attr === null) {
-            continue;
-        }
-
-        const renderer = getRenderer(scope, el);
-
-        if (jtEvent === "jt-load") {
-            eventCb(el, attr, renderer, context);
-            continue;
-        }
-
-        el.addEventListener(getEventName(jtEvent), (e) => eventCb(el, attr, renderer, context, e));
-    }
-};
-
-function eventCb(el, attr, renderer, context, e) {
-    const fn = window[attr];
-    const res = fn?.(el, e);
-
-    if (res instanceof Promise) {
-        res.then(() => {
-            renderer(context)
-        });
-        return;
-    }
-
-    renderer(context);
-}
-
-function getEventName(jtEvent) {
-    return jtEvent.slice(3);
 }
 
 function getFetchOptions(requester) {
