@@ -112,7 +112,7 @@ function compileIf(node) {
 }
 
 function compileInterpolation(template) {
-    if (!template?.length) {
+    if (!template || !template.length) {
         return;
     }
 
