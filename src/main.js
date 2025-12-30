@@ -263,7 +263,9 @@ if (document.readyState === "loading") {
     JTML.apply();
 }
 
-window.JTML = JTML;
+export default JTML;
+
+// window.JTML = JTML;
 // 550
 // 338
 // 670 peak

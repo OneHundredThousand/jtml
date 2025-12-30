@@ -12,13 +12,18 @@
         "watch": "npx esbuild src/main.js --bundle --sourcemap --outfile=${BUILD_OUT:-.}/build.js --target=es6 --format=iife --watch",
         "terser": "terser ${TERSER_IN:-.}/build.js -o ${TERSER_OUT:-.}/jtml-min.js -c -m",
         "dev": "concurrently 'BUILD_OUT=dev npm run watch' 'npx serve ./dev'",
-        "update-doc": "BUILD_OUT=docs npm run build && TERSER_IN=docs TERSER_OUT=docs npm run terser"
+        "update-doc": "BUILD_OUT=docs npm run build && TERSER_IN=docs TERSER_OUT=docs npm run terser",
+        "rollup": "NODE_ENV=production npx rollup -c rollup.config.mjs"
     },
     "keywords": [],
     "author": "",
     "license": "ISC",
     "devDependencies": {
-        "esbuild": "^0.25.5"
+        "@rollup/plugin-commonjs": "^29.0.0",
+        "@rollup/plugin-node-resolve": "^16.0.3",
+        "@rollup/plugin-terser": "^0.4.4",
+        "esbuild": "^0.25.5",
+        "rollup": "^4.54.0"
     },
     "dependencies": {
         "concurrently": "^9.2.1",
