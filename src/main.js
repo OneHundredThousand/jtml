@@ -187,7 +187,7 @@ async function jtRequester(scope, requester) {
 }
 
 function getFetchOptions(requester) {
-    const url = requester.getAttribute("action") || requester.getAttribute("href");
+    let url = requester.getAttribute("action") || requester.getAttribute("href");
     const method = (requester.getAttribute("method") || "GET").toUpperCase();
 
     const options = {
@@ -195,12 +195,19 @@ function getFetchOptions(requester) {
         headers: {},
     };
 
-    const isWriteMethod = ["post", "put", "patch"].includes(method);
+    const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
     if (isWriteMethod) {
         const body = extractRequestBody(requester);
         options.body = JSON.stringify(body);
 
         options.headers = { "Content-Type": "application/json" };
+    }
+
+    if (method === "GET") {
+        const data = new FormData(requester);
+        const params = new URLSearchParams(data);
+
+        url = `${url}?${params.toString()}`;
     }
 
     return {
