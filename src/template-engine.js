@@ -112,6 +112,10 @@ function compileIf(node) {
 }
 
 function compileInterpolation(template) {
+    if (template === "") {
+        return ctx => ctx;
+    }
+
     if (!template || !template.length) {
         return;
     }
@@ -204,7 +208,7 @@ function renderNode(renderer, context, isTemplate) {
         return;
     }
 
-    if (foreach) {
+    if (foreach !== null) {
         const items = getNestedValue(context, foreach);
         if (!Array.isArray(items)) {
             return null;
@@ -249,6 +253,10 @@ function renderNode(renderer, context, isTemplate) {
 }
 
 function getNestedValue(obj, paths) {
+    if (paths === "") {
+        return obj;
+    }
+
     let current = obj;
     for (const path of paths.split('.')) {
         if (!current) {
