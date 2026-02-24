@@ -358,19 +358,19 @@ function getResponseBody(res) {
     return res.json();
 };
 
-// function resolveElFromAttr(el, attr) {
-//     const selector = el.getAttribute(attr);
-//     if (!selector) {
-//         return null;
-//     }
+function resolveElFromAttr(el, attr) {
+    const selector = el.getAttribute(attr);
+    if (!selector) {
+        return null;
+    }
 
-//     try {
-//         return document.querySelector(selector);
-//     } catch {
-//         console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
-//         return null;
-//     }
-// }
+    try {
+        return document.querySelector(selector);
+    } catch {
+        console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        return null;
+    }
+}
 
 function resolveElsFromAttr(el, attr) {
     const selector = el.getAttribute(attr);
