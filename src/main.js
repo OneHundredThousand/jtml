@@ -2,9 +2,6 @@ import { compileTemplate } from "./template-engine.js";
 
 const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
 
-// store access sequence on load
-// and parase JTML.store.add first?
-
 const JTStore = {
     data: {},
 
