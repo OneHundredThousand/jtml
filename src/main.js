@@ -1,41 +1,141 @@
-import * as utils from "./template-engine.js";
+import { compileTemplate } from "./template-engine.js";
 
 const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
 
+const JTStore = {
+    data: {},
+
+    add(key, value) {
+        this.data[key] = value;
+    },
+
+    get(key) {
+        return this.data[key];
+    },
+
+    // remove(key) {
+    //     delete this.data[key];
+    // },
+
+    // clearPrefix(prefix) {
+    //     for (const key in this.data) {
+    //         if (key.startsWith(prefix)) {
+    //             delete this.data[key];
+    //         }
+    //     }
+    // },
+
+    // clearAll() {
+    //     this.data = {};
+    // }
+};
+
 const JTML = {
     apply: function (root = document.body) {
-        const scopes = root.querySelectorAll("[jt-scope]");
-
-        for (const scope of scopes) {
-            JTML.bindDom(scope);
-        }
-    },
-    bindDom: function (scope, el = scope) {
-        console.log("Processing JTML el:", el);
-
-        // actors
-        // pipelines
-        // decorator
-
-        const scopeInit = window[el.getAttribute("jt-scope")];
-        const context = scopeInit && scopeInit();
-
-        const actors = el.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
+        const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
 
         for (const actor of actors) {
             if (actor._redered) {
                 continue;
             }
 
-            bindEvents(scope, actor, context);
+            bindEvents(actor);
             actor._redered = true;
         }
+
+        if (__DEBUG__) {
+            debug(root);
+        }
     },
+    store: JTStore,
 };
 
-function bindEvents(scope, el, context) {
-    const source = resolveElFromAttr(scope, el, 'jt-source') || el;
-    const renderer = getRenderer(scope, el);
+if (__DEBUG__) {
+    const script = document.currentScript;
+
+    function debug(root) {
+        const url = new URL(script.src);
+        const params = url.searchParams;
+
+        if (params.has("debug")) {
+            const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
+
+            const jtProps = {
+                "jt-source": (actor) => actor.getAttribute("jt-source"),
+                "jt-store": (actor) => actor.hasAttribute("jt-store"),
+                "jt-html": (actor) => actor.hasAttribute("jt-html"),
+                "jt-render": (actor) => resolveElFromAttr(actor, "jt-render"),
+                "jt-target": (actor) => resolveElFromAttr(actor, "jt-target"),
+                "jt-swap": (actor) => actor.getAttribute("jt-swap") || "jt-replace",
+                "jt-after": (actor) => resolveElsFromAttr(actor, "jt-after"),
+            }
+
+            for (const actor of actors) {
+                const event = SupportedEvents.find(event => actor.hasAttribute(event));
+                const props = {
+                    actor,
+                    event,
+                };
+
+                for (const jtProp in jtProps) {
+                    if (!actor.hasAttribute(jtProp) && !params.has("verbose")) {
+                        continue;
+                    }
+
+                    props[jtProp] = jtProps[jtProp](actor);
+                }
+
+                console.log("Processing JTML el:", props);
+            }
+        }
+    }
+}
+
+// function bindNavigation(root) {
+//     const links = root.querySelectorAll("[jt-nav]");
+
+//     for (const link of links) {
+//         link.addEventListener("click", async (e) => {
+//             e.preventDefault();
+
+//             const url = link.getAttribute("href");
+//             if (!url) {
+//                 return;
+//             }
+
+//             await navigate(url);
+//         });
+//     }
+// }
+
+// async function navigate(url) {
+//     try {
+//         const res = await fetch(url, { method: "GET" });
+//         const html = await res.text();
+
+//         const parser = new DOMParser();
+//         const doc = parser.parseFromString(html, "text/html");
+
+//         const newBody = doc.body;
+//         if (!newBody) {
+//             return;
+//         }
+
+//         // Clear page-level store only
+//         JTStore.clearPrefix("page:");
+
+//         document.body.replaceWith(newBody);
+
+//         JTML.apply(document);
+//         window.history.pushState({}, "", url);
+
+//     } catch (err) {
+//         console.error("[jtml] navigation failed:", err);
+//     }
+// }
+
+function bindEvents(el) {
+    const renderer = getRenderer(el);
 
     for (const jtEvent of SupportedEvents) {
         const eventVal = el.getAttribute(jtEvent);
@@ -45,15 +145,15 @@ function bindEvents(scope, el, context) {
         }
 
         if (jtEvent === "jt-load") {
-            handleEvent(scope, el, eventVal, renderer, context, source);
+            handleEvent(el, eventVal, renderer);
             continue;
         }
 
-        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(scope, el, eventVal, renderer, context, source, evt));
+        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, eventVal, renderer, evt));
     }
 }
 
-async function handleEvent(scope, el, eventVal, renderer, context, source, evt) {
+async function handleEvent(el, eventVal, renderer, evt) {
     if (evt) {
         evt.preventDefault();
     }
@@ -63,40 +163,61 @@ async function handleEvent(scope, el, eventVal, renderer, context, source, evt) 
         return;
     }
 
-    if (!renderer) {
-        return;
+    let context = {};
+
+    const source = JTStore.get(el.getAttribute("jt-source"));
+    if (source) {
+        context = source;
     }
 
-    if (["FORM", "A"].includes(source.tagName)) {
-        const response = await jtRequester(scope, source);
+    if (["FORM", "A"].includes(el.tagName)) {
+        const response = await jtRequester(el);
         if (!response) {
             return;
         }
-        renderer(response);
+
+        const storeKey = el.getAttribute("jt-store");
+        if (storeKey) {
+            JTStore.add(storeKey, response);
+        }
+
+        actions(el, renderer, context ? { ...context, ...response } : response);
         return;
     }
 
-    renderer(context);
+    actions(el, renderer, context);
 }
 
-function getRenderer(scope, requester) {
-    const template = getTemplater(scope, requester);
+function actions(el, renderer, context) {
+    if (renderer) {
+        renderer(context);
+    }
+
+    const afters = resolveElsFromAttr(el, "jt-after") || [];
+    for (const after of afters) {
+        const afterRenderer = getRenderer(after);
+        handleEvent(after, "", afterRenderer);
+    }
+}
+
+function getRenderer(requester) {
+    const template = getTemplater(requester);
     if (!template) {
         return;
     }
 
-    const target = resolveElFromAttr(scope, requester, "jt-target") || requester;
+    const target = resolveElFromAttr(requester, "jt-target") || requester;
     const swapper = getSwapper(requester);
 
-    return (data) => render(scope, template, data, swapper, target);
+    return (data) => render(template, data, swapper, target);
 }
 
-function getTemplater(scope, requester) {
+function getTemplater(requester) {
     if (requester.hasAttribute('jt-html')) {
         return data => data;
     }
 
-    const template = resolveElFromAttr(scope, requester, "jt-render");
+    const template = resolveElFromAttr(requester, "jt-render");
     if (!template) {
         return;
     }
@@ -105,13 +226,13 @@ function getTemplater(scope, requester) {
         return template._compiled;
     }
 
-    const compiled = utils.compileTemplate(template);
+    const compiled = compileTemplate(template);
     template._compiled = compiled;
 
     return compiled;
 }
 
-function render(scope, renderer, data, swapper, target) {
+function render(renderer, data, swapper, target) {
     const dom = renderer(data);
     if (!dom) {
         return;
@@ -119,7 +240,7 @@ function render(scope, renderer, data, swapper, target) {
 
     swapper(target, dom);
 
-    JTML.bindDom(scope, target);
+    JTML.apply(target);
 }
 
 function getSwapper(el) {
@@ -163,9 +284,9 @@ async function fnRunner(name, ...args) {
     return (fn && fn(...args));
 }
 
-async function jtRequester(scope, requester) {
-    const loadingEl = resolveElFromAttr(scope, requester, "jt-loading");
-    const errorEl = resolveElFromAttr(scope, requester, "jt-error");
+async function jtRequester(requester) {
+    const loadingEl = resolveElFromAttr(requester, "jt-loading");
+    const errorEl = resolveElFromAttr(requester, "jt-error");
 
     showElement(loadingEl);
     hideElement(errorEl);
@@ -207,7 +328,10 @@ function getFetchOptions(requester) {
         const data = new FormData(requester);
         const params = new URLSearchParams(data);
 
-        url = `${url}?${params.toString()}`;
+        const _url = new URL(url, window.location.href);
+        _url.search = params;
+
+        url = _url.toString();
     }
 
     return {
@@ -234,19 +358,33 @@ function getResponseBody(res) {
     return res.json();
 };
 
-function resolveElFromAttr(scope, el, attr) {
+// function resolveElFromAttr(el, attr) {
+//     const selector = el.getAttribute(attr);
+//     if (!selector) {
+//         return null;
+//     }
+
+//     try {
+//         return document.querySelector(selector);
+//     } catch {
+//         console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+//         return null;
+//     }
+// }
+
+function resolveElsFromAttr(el, attr) {
     const selector = el.getAttribute(attr);
     if (!selector) {
         return null;
     }
 
     try {
-        return scope.querySelector(selector);
+        return document.querySelectorAll(selector);
     } catch {
         console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
         return null;
     }
-};
+}
 
 function showElement(el) {
     if (!el) {
@@ -270,9 +408,7 @@ if (document.readyState === "loading") {
     JTML.apply();
 }
 
-export default JTML;
+window.JTML = JTML;
 
-// window.JTML = JTML;
-// 550
 // 338
 // 670 peak
