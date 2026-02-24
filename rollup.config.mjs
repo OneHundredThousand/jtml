@@ -1,6 +1,7 @@
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import terser from "@rollup/plugin-terser";
+import replace from '@rollup/plugin-replace';
 
 const isProd = process.env.NODE_ENV === "production";
 
@@ -13,6 +14,11 @@ export default {
     name: "JTML"
   },
   plugins: [
+    replace({
+      preventAssignment: true,
+      __DEBUG__: 'false',
+      'process.env.NODE_ENV': JSON.stringify('production')
+    }),
     resolve(),
     commonjs(),
     isProd && terser({
