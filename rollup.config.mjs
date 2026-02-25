@@ -4,20 +4,25 @@ import terser from "@rollup/plugin-terser";
 import replace from '@rollup/plugin-replace';
 
 const isProd = process.env.NODE_ENV === "production";
+const outputPath = process.env.OUTPUT_PATH || 'docs';
 
 export default {
   input: "src/main.js",
   output: {
-    file: "docs/jtml-min.js",
+    file: `${outputPath}/jtml-min.js`,
     format: "iife", // or "iife" for browser
     sourcemap: !isProd,
     name: "JTML"
   },
+  watch: {
+    include: "src/**",
+    exclude: "node_modules/**",
+    clearScreen: false,
+  },
   plugins: [
     replace({
       preventAssignment: true,
-      __DEBUG__: 'false',
-      'process.env.NODE_ENV': JSON.stringify('production')
+      'process.env.NODE_ENV': isProd ? JSON.stringify('production') : JSON.stringify('development')
     }),
     resolve(),
     commonjs(),

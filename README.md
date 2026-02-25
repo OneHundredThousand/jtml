@@ -1,162 +1,230 @@
-# jtml
+# JTML
 
-**jtml** is a lightweight, declarative JavaScript micro‑library for wiring HTML to JSON‑driven behavior using attributes.
+JTML is a lightweight, attribute-driven JavaScript micro-library that turns plain HTML into interactive, data-driven UI — without becoming a framework.
 
-It is inspired by HTMX and Alpine, but deliberately opinionated: **HTML comes first, JavaScript stays boring, and JSON is the default data shape.**
+- No virtual DOM  
+- No components  
+- No build step required  
+- No hidden lifecycle  
 
-There are no components, no virtual DOM, no build step, and no framework abstractions to learn.
-
-> jtml = **JSON Template Markup Language**
+**JTML = JSON Template Markup Language**
 
 ---
 
 ## ✨ Core Ideas
 
-* Markup defines structure **and behavior**
-* One request or action per element
-* Templates live next to the thing that triggers them
-* Targets are scoped locally
-* JSON is assumed unless told otherwise
+- HTML defines structure and behavior  
+- One actor element = one action  
+- Templates stay in `<template>`  
+- JSON is the default data shape  
+- Explicit over implicit  
 
-If something gets complex, jtml doesn’t try to hide it — you drop to plain JavaScript.
+JTML enhances real HTML — it doesn’t replace it.
 
 ---
 
 ## 🚀 Quick Start
 
 ```html
-<div jt-scope="postsScope">
-  <form action="/posts" method="get" jt-render="#tpl" jt-target="#list" jt-load>
-    <template id="tpl">
-      <ul>
-        <li jt-foreach=".">
-          <span jt-text="title"></span>
-        </li>
-      </ul>
-    </template>
-    <div id="list"></div>
-  </form>
-</div>
+<form 
+  action="/posts"
+  method="GET"
+  jt-render="#posts-template"
+  jt-target="#output"
+  jt-load
+>
+</form>
 
-<script>
-function postsScope() {
-  return {};
-}
-</script>
+<template id="posts-template">
+  <ul>
+    <li jt-foreach="items">
+      <span jt-text="{title}"></span>
+    </li>
+  </ul>
+</template>
+
+<div id="output"></div>
+
 <script src="jtml.js"></script>
 ```
 
-If `/posts` returns JSON, it will be rendered automatically into `#list`.
+If `/posts` returns JSON like:
 
----
-
-## 🧭 Scopes (`jt-scope`)
-
-All jtml behavior lives inside a **scope**.
-
-```html
-<div jt-scope="myScope">...</div>
+```json
+{
+  "items": [
+    { "title": "First" },
+    { "title": "Second" }
+  ]
+}
 ```
 
-* The attribute value must be the name of a global function
-* That function is called once and its return value becomes the **context**
-* Targets, templates, loading, and error elements are all resolved **inside the scope only**
-
-No nested scopes. No global DOM wandering.
+JTML renders it automatically.
 
 ---
 
-## 🔁 Requests (Forms & Anchors)
+## ⚡ Supported Events
 
-jtml treats **forms** and **anchors** as request elements.
+JTML binds behavior using `jt-*` attributes.
 
-### Forms
+- `jt-click`
+- `jt-submit`
+- `jt-input`
+- `jt-change`
+- `jt-load`
+
+Example:
+
+```html
+<button 
+  jt-click="handleClick"
+  jt-render="#result"
+  jt-target="#out">
+  Click
+</button>
+```
+
+```javascript
+function handleClick(el, event) {
+  console.log("clicked");
+}
+```
+
+If the handler returns `false`, rendering is skipped.  
+If it returns a `Promise`, rendering waits.
+
+---
+
+## 🔁 Forms & Anchors (Requests)
+
+Forms and anchors automatically use `fetch()`.
 
 ```html
 <form
   action="/users"
-  method="post"
-  jt-render="#userTpl"
+  method="POST"
+  jt-render="#user-template"
   jt-target="#users"
+  jt-store="usersData"
 >
+</form>
 ```
 
-* Uses `fetch()` under the hood
-* Write methods (`POST`, `PUT`, `PATCH`) send JSON bodies
-* `GET` requests do not
+### Behavior
 
-### Anchors
+- `GET` → query string via `URLSearchParams`
+- `POST`, `PUT`, `PATCH` → JSON body
 
-```html
-<a href="/users" jt-render="#tpl" jt-target="#out">Load</a>
-```
+Response auto-parsed:
 
-Anchors always trigger on click unless overridden.
+- `application/json` → `res.json()`
+- `text/html` → `res.text()`
 
 ---
 
 ## 🧩 Rendering (`jt-render`)
 
-`jt-render` points to a `<template>` **inside the same scope**.
+`jt-render` points to a `<template>`.
 
 ```html
-<template id="tpl">
-  <div jt-foreach=".">
-    <span jt-text="name"></span>
+<template id="user-template">
+  <div>
+    <h3 jt-text="{name}"></h3>
+    <p jt-text="{email}"></p>
   </div>
 </template>
 ```
 
-* Templates are compiled once
-* JSON data is passed directly to the renderer
-* The renderer returns DOM (or HTML if `jt-html` is used)
+### Supported Template Directives
+
+- `jt-text="{path.to.value}"`
+- `jt-foreach="items"`
+- `jt-if="count gt 0"`
+- `jt-attr:href="{url}"`
+
+### Conditional Operators
+
+- `eq`
+- `neq`
+- `gt`
+- `lt`
+- `gte`
+- `lte`
+
+Example:
+
+```html
+<div jt-if="count gt 0">
+  Has items
+</div>
+```
+
+Templates are compiled once and cached automatically.
 
 ---
 
 ## 🎯 Targets (`jt-target`)
 
 ```html
-<div jt-target="#output"></div>
+jt-target="#output"
 ```
 
-* Must resolve inside the same scope
-* If omitted, rendering happens in place
-
-This avoids invisible cross‑DOM side effects.
+If omitted, rendering happens in place.
 
 ---
 
 ## 🔄 Swap Strategies (`jt-swap`)
 
-Controls how rendered output is inserted.
+Controls how output is inserted:
 
-| Value   | Behavior                   |
-| ------- | -------------------------- |
-| replace | Replace children (default) |
-| append  | Append output              |
-| prepend | Prepend output             |
+| Value   | Behavior                     |
+|---------|-----------------------------|
+| replace | Replace children (default)  |
+| append  | Append output               |
+| prepend | Prepend output              |
+
+Example:
 
 ```html
 <form jt-swap="append">...</form>
 ```
 
-### HTML vs DOM
+---
 
-* Default: rendered output is **DOM nodes**
-* Add `jt-html` to treat render output as raw HTML strings
+## 🧠 Global Store
+
+JTML includes a tiny key/value store.
+
+```javascript
+JTML.store.add("user", { name: "Arthur" });
+
+const user = JTML.store.get("user");
+```
+
+Use it via `jt-source`:
+
+```html
+<div 
+  jt-source="user"
+  jt-render="#profile-template">
+</div>
+```
+
+The stored object becomes the render context.
 
 ---
 
 ## ⏳ Loading & Error States
 
 ```html
-<form jt-loading="#loading" jt-error="#error">...</form>
+<form
+  jt-loading="#loading"
+  jt-error="#error">
+</form>
 ```
 
-* `jt-loading`: shown during request
-* `jt-error`: shown if request fails
-
-Both selectors are resolved locally.
+- `jt-loading` → shown during request  
+- `jt-error` → shown if request fails  
 
 ---
 
@@ -168,93 +236,73 @@ Hooks are plain global functions.
 <form
   jt-pre-request-fn="beforeReq"
   jt-post-request-fn="afterReq"
-  jt-request-error-fn="onError"
->
+  jt-request-error-fn="onError">
+</form>
 ```
 
-```js
+```javascript
 function beforeReq(el, options) {}
-function afterReq(el, res, body) {}
+function afterReq(el, response, body) {}
 function onError(el, error) {}
 ```
 
-No magic. No hidden state.
+No framework lifecycle. Just functions.
 
 ---
 
-## ⚡ Event Binding (`jt-*` events)
+## 🔍 Debug Mode
 
-Supported events:
-
-* `jt-click`
-* `jt-submit`
-* `jt-input`
-* `jt-change`
-* `jt-load`
+Enable via query string:
 
 ```html
-<button jt-click="increment">+</button>
+<script src="jtml.js?debug"></script>
 ```
 
-```js
-function increment(el, e) {
-  console.log("clicked");
-}
-```
+Optional flags:
 
-Rules:
+- `?debug`
+- `?debug&debug-only`
+- `?debug&debug-verbose`
 
-* **One event per element**
-* Forms and anchors are excluded (they already have request semantics)
-* If the handler returns a Promise, rendering waits for it
+Logs actor processing details to the console.
 
 ---
 
-## 🧠 Context Rendering
+## 🔄 Manual Re-Apply
 
-Event handlers can trigger renders using the scope context.
+JTML runs automatically on `DOMContentLoaded`.
 
-```js
-function update(el) {
-  return fetch("/data");
-}
+You can manually re-bind:
+
+```javascript
+JTML.apply();
 ```
 
-Once resolved, the renderer runs using the scope context.
+Or apply to a subtree:
 
----
-
-## 🧪 Template Directives
-
-Supported template attributes:
-
-* `jt-foreach="items"`
-* `jt-text="field"`
-* `jt-if="a eq b"`
-* `jt-attr:name="value"`
-
-Interpolation is supported:
-
-```html
-<span>{{ user.name }}</span>
+```javascript
+JTML.apply(someElement);
 ```
 
 ---
 
 ## 🧠 Philosophy
 
-jtml is intentionally **not** a framework.
+JTML is intentionally not a framework.
 
-* It does not manage state
-* It does not own navigation
-* It does not invent new syntax
+- No component system  
+- No router  
+- No global state management  
+- No hidden diffing  
+- No magical reactivity  
 
-It is a helper that makes boring HTML powerful again.
+It enhances HTML with predictable, explicit behavior.
 
-If your app starts fighting jtml, that’s your signal to use plain JavaScript — not bend the library.
+If things get complicated, use plain JavaScript.  
+JTML doesn’t try to compete with full frameworks — it avoids becoming one.
 
 ---
 
 ## 📄 License
 
-MIT. Use it. Abuse it. Keep it simple.
+MIT
