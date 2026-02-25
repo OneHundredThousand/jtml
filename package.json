@@ -8,12 +8,9 @@
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
-        "build": "npx esbuild src/main.js --bundle --minify --sourcemap --outfile=${BUILD_OUT:-.}/build.js --target=es6 --format=iife",
-        "watch": "npx esbuild src/main.js --bundle --sourcemap --outfile=${BUILD_OUT:-.}/build.js --target=es6 --format=iife --watch",
-        "terser": "terser ${TERSER_IN:-.}/build.js -o ${TERSER_OUT:-.}/jtml-min.js -c -m",
-        "dev": "concurrently 'BUILD_OUT=dev npm run watch' 'npx serve ./dev'",
-        "update-doc": "BUILD_OUT=docs npm run build && TERSER_IN=docs TERSER_OUT=docs npm run terser",
-        "rollup": "NODE_ENV=production npx rollup -c rollup.config.mjs"
+        "watch": "OUTPUT_PATH=dev npx rollup -c rollup.config.mjs --watch",
+        "build": "NODE_ENV=production npx rollup -c rollup.config.mjs",
+        "dev": "concurrently 'npm run watch' 'npx serve ./dev'"
     },
     "keywords": [],
     "author": "",
@@ -23,7 +20,6 @@
         "@rollup/plugin-node-resolve": "^16.0.3",
         "@rollup/plugin-replace": "^6.0.3",
         "@rollup/plugin-terser": "^0.4.4",
-        "esbuild": "^0.25.5",
         "rollup": "^4.54.0"
     },
     "dependencies": {
