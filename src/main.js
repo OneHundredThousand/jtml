@@ -1,8 +1,6 @@
 import { compileTemplate } from "./template-engine.js";
-
-const __DEBUG__ = process.env.NODE_ENV !== "production";
-
-const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
+import { SupportedEvents } from "./events.js";
+import { debug } from "./debugger.js";
 
 const JTStore = {
     data: {},
@@ -43,71 +41,16 @@ const JTML = {
 
             bindEvents(actor);
             actor._redered = true;
-        }
 
-        debug(root);
+            debug(actor);
+        }
+    },
+    run: function (el) {
+        handleEvent(el, "");
     },
     store: JTStore,
 };
 
-const script = document.currentScript;
-
-function debug(root) {
-    if (!__DEBUG__) {
-        return;
-    }
-
-    const url = new URL(script.src);
-    const params = url.searchParams;
-
-    if (params.has("debug")) {
-        const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
-
-        const jtProps = {
-            "jt-source": (actor) => actor.getAttribute("jt-source"),
-            "jt-store": (actor) => actor.hasAttribute("jt-store"),
-            "jt-html": (actor) => actor.hasAttribute("jt-html"),
-            "jt-render": (actor) => resolveElFromAttr(actor, "jt-render"),
-            "jt-target": (actor) => resolveElFromAttr(actor, "jt-target"),
-            "jt-swap": (actor) => actor.getAttribute("jt-swap") || "jt-replace",
-            "jt-after": (actor) => resolveElsFromAttr(actor, "jt-after"),
-
-            "jt-loading": (actor) => resolveElFromAttr(actor, "jt-loading"),
-            "jt-error": (actor) => resolveElFromAttr(actor, "jt-error"),
-
-            "jt-pre-request-fn": (actor) => window[actor.getAttribute("jt-pre-request-fn")],
-            "jt-post-request-fn": (actor) => window[actor.getAttribute("jt-post-request-fn")],
-            "jt-request-error-fn": (actor) => window[actor.getAttribute("jt-request-error-fn")]
-        };
-
-        for (const event of SupportedEvents) {
-            jtProps[event] = (actor) => window[actor.getAttribute(event)];
-        }
-
-        for (const actor of actors) {
-
-            if (params.has("debug-only")) {
-                if (!actor.hasAttribute("jt-debug-only")) {
-                    continue;
-                }
-            }
-
-            const props = {
-                actor,
-            };
-
-            for (const jtProp in jtProps) {
-                if (!actor.hasAttribute(jtProp) && !params.has("debug-verbose")) {
-                    continue;
-                }
-
-                props[jtProp] = jtProps[jtProp](actor);
-            }
-
-            console.log("Processing JTML el:", props);
-        }
-    }
-}
 
 // function bindNavigation(root) {
 //     const links = root.querySelectorAll("[jt-nav]");
@@ -153,25 +96,25 @@ function debug(root) {
 // }
 
 function bindEvents(el) {
-    const renderer = getRenderer(el);
+    // const renderer = getRenderer(el);
 
     for (const jtEvent of SupportedEvents) {
-        const eventVal = el.getAttribute(jtEvent);
+        const jtEventFnName = el.getAttribute(jtEvent);
 
-        if (eventVal === null) {
+        if (jtEventFnName === null) {
             continue;
         }
 
         if (jtEvent === "jt-load") {
-            handleEvent(el, eventVal, renderer);
+            handleEvent(el, jtEventFnName);
             continue;
         }
 
-        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, eventVal, renderer, evt));
+        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, evt));
     }
 }
 
-async function handleEvent(el, eventVal, renderer, evt) {
+async function handleEvent(el, eventVal, evt) {
     if (evt) {
         evt.preventDefault();
     }
@@ -181,12 +124,7 @@ async function handleEvent(el, eventVal, renderer, evt) {
         return;
     }
 
-    let context = {};
-
-    const source = JTStore.get(el.getAttribute("jt-source"));
-    if (source) {
-        context = source;
-    }
+    const renderer = getRenderer(el);
 
     if (["FORM", "A"].includes(el.tagName)) {
         const response = await jtRequester(el);
@@ -199,8 +137,15 @@ async function handleEvent(el, eventVal, renderer, evt) {
             JTStore.add(storeKey, response);
         }
 
-        actions(el, renderer, context ? { ...context, ...response } : response);
+        actions(el, renderer, response);
         return;
+    }
+
+    let context = {};
+
+    const source = JTStore.get(el.getAttribute("jt-source"));
+    if (source) {
+        context = source;
     }
 
     actions(el, renderer, context);
@@ -213,8 +158,8 @@ function actions(el, renderer, context) {
 
     const afters = resolveElsFromAttr(el, "jt-after") || [];
     for (const after of afters) {
-        const afterRenderer = getRenderer(after);
-        handleEvent(after, "", afterRenderer);
+        //     const afterRenderer = getRenderer(after);
+        handleEvent(after, "");
     }
 }
 
@@ -251,6 +196,7 @@ function getTemplater(requester) {
 }
 
 function render(renderer, data, swapper, target) {
+    console.log(data);
     const dom = renderer(data);
     if (!dom) {
         return;
@@ -262,6 +208,7 @@ function render(renderer, data, swapper, target) {
 }
 
 function getSwapper(el) {
+    // @TODO add debugging loggiger
     const swapType = el.getAttribute('jt-swap') || 'replace';
     return {
         replace: (target, dom) => typeof dom === "string" ? target.innerHTML = dom : target.replaceChildren(dom),
@@ -298,6 +245,7 @@ async function httpRequest(requester) {
 }
 
 async function fnRunner(name, ...args) {
+    // @TODO add debugging logic
     const fn = window[name];
     return (fn && fn(...args));
 }
@@ -334,7 +282,7 @@ function getFetchOptions(requester) {
         headers: {},
     };
 
-    const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
+    const isWriteMethod = requester.tagName === "FORM" && ["POST", "PUT", "PATCH"].includes(method);
     if (isWriteMethod) {
         const body = extractRequestBody(requester);
         options.body = JSON.stringify(body);
@@ -342,7 +290,7 @@ function getFetchOptions(requester) {
         options.headers = { "Content-Type": "application/json" };
     }
 
-    if (method === "GET") {
+    if (method === "GET" && requester.tagName === "FORM") {
         const data = new FormData(requester);
         const params = new URLSearchParams(data);
 
