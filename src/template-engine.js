@@ -178,7 +178,7 @@ function compileInterpolation(template) {
 
         if (ast.length === 1) {
             const val = getNestedValue(ctx, ast[0].value);
-            out += val ? String(val) : ast[0].value;
+            out += val !== undefined ? String(val) : ast[0].value;
         } else {
             for (const node of ast) {
                 if (node.type === "text") {

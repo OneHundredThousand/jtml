@@ -1,39 +1,14 @@
 import { compileTemplate } from "./template-engine.js";
+import { SupportedEvents } from "./events.js";
+import { JTStore } from "./store.js";
+import { debug, error, warn } from "./debugger.js";
 
-const __DEBUG__ = process.env.NODE_ENV !== "production";
-
-const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
-
-const JTStore = {
-    data: {},
-
-    add(key, value) {
-        this.data[key] = value;
-    },
-
-    get(key) {
-        return this.data[key];
-    },
-
-    // remove(key) {
-    //     delete this.data[key];
-    // },
-
-    // clearPrefix(prefix) {
-    //     for (const key in this.data) {
-    //         if (key.startsWith(prefix)) {
-    //             delete this.data[key];
-    //         }
-    //     }
-    // },
-
-    // clearAll() {
-    //     this.data = {};
-    // }
-};
+// show loading befor jt-fn?
+// global hooks
 
 const JTML = {
-    apply: function (root = document.body) {
+    // globalHooks: [],
+    apply: (root = document.body) => {
         const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
 
         for (const actor of actors) {
@@ -43,71 +18,21 @@ const JTML = {
 
             bindEvents(actor);
             actor._redered = true;
-        }
 
-        debug(root);
+            debug(actor);
+        }
+    },
+    run: (el) => {
+        handleEvent(el, "");
     },
     store: JTStore,
+    // registerGlobalHook: (fn) => {
+    //     warnCb(() => typeof fn !== "function", `[jtml] cannot register non-function global hook ${fn}`);
+
+    //     JTML.globalHooks.push(fn);
+    // }
 };
 
-const script = document.currentScript;
-
-function debug(root) {
-    if (!__DEBUG__) {
-        return;
-    }
-
-    const url = new URL(script.src);
-    const params = url.searchParams;
-
-    if (params.has("debug")) {
-        const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
-
-        const jtProps = {
-            "jt-source": (actor) => actor.getAttribute("jt-source"),
-            "jt-store": (actor) => actor.hasAttribute("jt-store"),
-            "jt-html": (actor) => actor.hasAttribute("jt-html"),
-            "jt-render": (actor) => resolveElFromAttr(actor, "jt-render"),
-            "jt-target": (actor) => resolveElFromAttr(actor, "jt-target"),
-            "jt-swap": (actor) => actor.getAttribute("jt-swap") || "jt-replace",
-            "jt-after": (actor) => resolveElsFromAttr(actor, "jt-after"),
-
-            "jt-loading": (actor) => resolveElFromAttr(actor, "jt-loading"),
-            "jt-error": (actor) => resolveElFromAttr(actor, "jt-error"),
-
-            "jt-pre-request-fn": (actor) => window[actor.getAttribute("jt-pre-request-fn")],
-            "jt-post-request-fn": (actor) => window[actor.getAttribute("jt-post-request-fn")],
-            "jt-request-error-fn": (actor) => window[actor.getAttribute("jt-request-error-fn")]
-        };
-
-        for (const event of SupportedEvents) {
-            jtProps[event] = (actor) => window[actor.getAttribute(event)];
-        }
-
-        for (const actor of actors) {
-
-            if (params.has("debug-only")) {
-                if (!actor.hasAttribute("jt-debug-only")) {
-                    continue;
-                }
-            }
-
-            const props = {
-                actor,
-            };
-
-            for (const jtProp in jtProps) {
-                if (!actor.hasAttribute(jtProp) && !params.has("debug-verbose")) {
-                    continue;
-                }
-
-                props[jtProp] = jtProps[jtProp](actor);
-            }
-
-            console.log("Processing JTML el:", props);
-        }
-    }
-}
 
 // function bindNavigation(root) {
 //     const links = root.querySelectorAll("[jt-nav]");
@@ -152,26 +77,26 @@ function debug(root) {
 //     }
 // }
 
-function bindEvents(el) {
-    const renderer = getRenderer(el);
+const bindEvents = (el) => {
+    // const renderer = getRenderer(el);
 
     for (const jtEvent of SupportedEvents) {
-        const eventVal = el.getAttribute(jtEvent);
+        const jtEventFnName = el.getAttribute(jtEvent);
 
-        if (eventVal === null) {
+        if (jtEventFnName === null) {
             continue;
         }
 
         if (jtEvent === "jt-load") {
-            handleEvent(el, eventVal, renderer);
+            handleEvent(el, jtEventFnName);
             continue;
         }
 
-        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, eventVal, renderer, evt));
+        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, evt));
     }
 }
 
-async function handleEvent(el, eventVal, renderer, evt) {
+const handleEvent = async (el, eventVal, evt) => {
     if (evt) {
         evt.preventDefault();
     }
@@ -181,12 +106,7 @@ async function handleEvent(el, eventVal, renderer, evt) {
         return;
     }
 
-    let context = {};
-
-    const source = JTStore.get(el.getAttribute("jt-source"));
-    if (source) {
-        context = source;
-    }
+    const renderer = getRenderer(el);
 
     if (["FORM", "A"].includes(el.tagName)) {
         const response = await jtRequester(el);
@@ -199,8 +119,15 @@ async function handleEvent(el, eventVal, renderer, evt) {
             JTStore.add(storeKey, response);
         }
 
-        actions(el, renderer, context ? { ...context, ...response } : response);
+        actions(el, renderer, response);
         return;
+    }
+
+    let context = {};
+
+    const source = JTStore.get(el.getAttribute("jt-source"));
+    if (source) {
+        context = source;
     }
 
     actions(el, renderer, context);
@@ -213,8 +140,8 @@ function actions(el, renderer, context) {
 
     const afters = resolveElsFromAttr(el, "jt-after") || [];
     for (const after of afters) {
-        const afterRenderer = getRenderer(after);
-        handleEvent(after, "", afterRenderer);
+        //     const afterRenderer = getRenderer(after);
+        handleEvent(after, "");
     }
 }
 
@@ -263,6 +190,11 @@ function render(renderer, data, swapper, target) {
 
 function getSwapper(el) {
     const swapType = el.getAttribute('jt-swap') || 'replace';
+    const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
+    if (swapType && !isValidSwapType) {
+        warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
+    }
+
     return {
         replace: (target, dom) => typeof dom === "string" ? target.innerHTML = dom : target.replaceChildren(dom),
         append: (target, dom) => typeof dom === "string" ? target.innerHTML += dom : target.appendChild(dom),
@@ -289,16 +221,20 @@ async function httpRequest(requester) {
         }
 
         return body;
-    } catch (error) {
-        await fnRunner(requester.getAttribute("jt-request-error-fn"), requester, error);
+    } catch (err) {
+        await fnRunner(requester.getAttribute("jt-request-error-fn"), requester, err);
 
-        console.error("[jtml] fetch failed:", url, error);
+        error("[jtml] fetch failed:", url, err);
         throw error;
     }
 }
 
 async function fnRunner(name, ...args) {
     const fn = window[name];
+    if (name && !fnExists) {
+        warn(`[jtml] cannot find function ${name}`);
+    }
+
     return (fn && fn(...args));
 }
 
@@ -321,7 +257,10 @@ async function jtRequester(requester) {
         hideElement(loadingEl);
         showElement(errorEl);
 
-        console.error("Form request failed:", err);
+        // double logged?
+
+        // console.error("[jtml] Form request failed:", err, "on actor", requester);
+        error("[jtml] Form request failed:", err, "on actor", requester);
     }
 }
 
@@ -334,7 +273,7 @@ function getFetchOptions(requester) {
         headers: {},
     };
 
-    const isWriteMethod = ["POST", "PUT", "PATCH"].includes(method);
+    const isWriteMethod = requester.tagName === "FORM" && ["POST", "PUT", "PATCH"].includes(method);
     if (isWriteMethod) {
         const body = extractRequestBody(requester);
         options.body = JSON.stringify(body);
@@ -342,7 +281,7 @@ function getFetchOptions(requester) {
         options.headers = { "Content-Type": "application/json" };
     }
 
-    if (method === "GET") {
+    if (method === "GET" && requester.tagName === "FORM") {
         const data = new FormData(requester);
         const params = new URLSearchParams(data);
 
@@ -385,7 +324,8 @@ function resolveElFromAttr(el, attr) {
     try {
         return document.querySelector(selector);
     } catch {
-        console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
 }
@@ -399,7 +339,8 @@ function resolveElsFromAttr(el, attr) {
     try {
         return document.querySelectorAll(selector);
     } catch {
-        console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
 }
