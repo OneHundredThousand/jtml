@@ -1,11 +1,11 @@
 const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
 
-const __DEBUG__ = process.env.NODE_ENV !== "production";
+const __DEVELOPMENT__ = process.env.NODE_ENV !== "production";
 
 const script = document.currentScript;
 
 export function debug(root) {
-    if (!__DEBUG__) {
+    if (!__DEVELOPMENT__) {
         return;
     }
 
@@ -59,4 +59,20 @@ export function debug(root) {
             console.log("Processing JTML el:", props);
         }
     }
+}
+
+export function error(...data) {
+    if (!__DEVELOPMENT__) {
+        return;
+    }
+
+    console.error(...data);
+}
+
+export function warn(data) {
+    if (!__DEVELOPMENT__) {
+        return;
+    }
+
+    console.warn(...data);
 }

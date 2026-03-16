@@ -1,37 +1,14 @@
 import { compileTemplate } from "./template-engine.js";
 import { SupportedEvents } from "./events.js";
-import { debug } from "./debugger.js";
+import { JTStore } from "./store.js";
+import { debug, error, warn } from "./debugger.js";
 
-const JTStore = {
-    data: {},
-
-    add(key, value) {
-        this.data[key] = value;
-    },
-
-    get(key) {
-        return this.data[key];
-    },
-
-    // remove(key) {
-    //     delete this.data[key];
-    // },
-
-    // clearPrefix(prefix) {
-    //     for (const key in this.data) {
-    //         if (key.startsWith(prefix)) {
-    //             delete this.data[key];
-    //         }
-    //     }
-    // },
-
-    // clearAll() {
-    //     this.data = {};
-    // }
-};
+// show loading befor jt-fn?
+// global hooks
 
 const JTML = {
-    apply: function (root = document.body) {
+    // globalHooks: [],
+    apply: (root = document.body) => {
         const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
 
         for (const actor of actors) {
@@ -45,10 +22,15 @@ const JTML = {
             debug(actor);
         }
     },
-    run: function (el) {
+    run: (el) => {
         handleEvent(el, "");
     },
     store: JTStore,
+    // registerGlobalHook: (fn) => {
+    //     warnCb(() => typeof fn !== "function", `[jtml] cannot register non-function global hook ${fn}`);
+
+    //     JTML.globalHooks.push(fn);
+    // }
 };
 
 
@@ -95,7 +77,7 @@ const JTML = {
 //     }
 // }
 
-function bindEvents(el) {
+const bindEvents = (el) => {
     // const renderer = getRenderer(el);
 
     for (const jtEvent of SupportedEvents) {
@@ -114,7 +96,7 @@ function bindEvents(el) {
     }
 }
 
-async function handleEvent(el, eventVal, evt) {
+const handleEvent = async (el, eventVal, evt) => {
     if (evt) {
         evt.preventDefault();
     }
@@ -196,7 +178,6 @@ function getTemplater(requester) {
 }
 
 function render(renderer, data, swapper, target) {
-    console.log(data);
     const dom = renderer(data);
     if (!dom) {
         return;
@@ -208,8 +189,12 @@ function render(renderer, data, swapper, target) {
 }
 
 function getSwapper(el) {
-    // @TODO add debugging loggiger
     const swapType = el.getAttribute('jt-swap') || 'replace';
+    const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
+    if (swapType && !isValidSwapType) {
+        warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
+    }
+
     return {
         replace: (target, dom) => typeof dom === "string" ? target.innerHTML = dom : target.replaceChildren(dom),
         append: (target, dom) => typeof dom === "string" ? target.innerHTML += dom : target.appendChild(dom),
@@ -236,17 +221,20 @@ async function httpRequest(requester) {
         }
 
         return body;
-    } catch (error) {
-        await fnRunner(requester.getAttribute("jt-request-error-fn"), requester, error);
+    } catch (err) {
+        await fnRunner(requester.getAttribute("jt-request-error-fn"), requester, err);
 
-        console.error("[jtml] fetch failed:", url, error);
+        error("[jtml] fetch failed:", url, err);
         throw error;
     }
 }
 
 async function fnRunner(name, ...args) {
-    // @TODO add debugging logic
     const fn = window[name];
+    if (name && !fnExists) {
+        warn(`[jtml] cannot find function ${name}`);
+    }
+
     return (fn && fn(...args));
 }
 
@@ -269,7 +257,10 @@ async function jtRequester(requester) {
         hideElement(loadingEl);
         showElement(errorEl);
 
-        console.error("Form request failed:", err);
+        // double logged?
+
+        // console.error("[jtml] Form request failed:", err, "on actor", requester);
+        error("[jtml] Form request failed:", err, "on actor", requester);
     }
 }
 
@@ -333,7 +324,8 @@ function resolveElFromAttr(el, attr) {
     try {
         return document.querySelector(selector);
     } catch {
-        console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
 }
@@ -347,7 +339,8 @@ function resolveElsFromAttr(el, attr) {
     try {
         return document.querySelectorAll(selector);
     } catch {
-        console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
 }
