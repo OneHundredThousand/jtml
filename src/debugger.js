@@ -1,4 +1,4 @@
-const SupportedEvents = ["jt-click", "jt-submit", "jt-input", "jt-change", "jt-load"];
+import { SupportedEvents } from "./events.js";
 
 const __DEVELOPMENT__ = process.env.NODE_ENV !== "production";
 
