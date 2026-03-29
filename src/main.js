@@ -231,7 +231,7 @@ async function httpRequest(requester) {
 
 async function fnRunner(name, ...args) {
     const fn = window[name];
-    if (name && !fnExists) {
+    if (name && !fn) {
         warn(`[jtml] cannot find function ${name}`);
     }
 
