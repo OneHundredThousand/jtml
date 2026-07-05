@@ -3,14 +3,20 @@ import { SupportedEvents } from "./events.js";
 import { JTStore } from "./store.js";
 import { debug, error, warn } from "./debugger.js";
 
+// 5375
+// 5577
+
+
 // show loading befor jt-fn?
 // global hooks
 
 const JTML = {
     // globalHooks: [],
+    addListeners: (...list) => {
+        list.forEach(value => SupportedEvents.add(`jt-${value}`));
+    },
     apply: (root = document.body) => {
-        const actors = root.querySelectorAll(`[${SupportedEvents.join("],[")}]`);
-
+        const actors = root.querySelectorAll(`[${[...SupportedEvents].join("],[")}]`);
         for (const actor of actors) {
             if (actor._redered) {
                 continue;
@@ -83,20 +89,25 @@ const bindEvents = (el) => {
     for (const jtEvent of SupportedEvents) {
         const jtEventFnName = el.getAttribute(jtEvent);
 
+        // console.log(jtEvent);
+
         if (jtEventFnName === null) {
             continue;
         }
 
+        const renderer = getRenderer(el); //@TODO async?
+
         if (jtEvent === "jt-load") {
-            handleEvent(el, jtEventFnName);
+            handleEvent(el, jtEventFnName, renderer);
             continue;
         }
 
-        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, evt));
+        // console.log(jtEvent.slice(3));
+        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, renderer, evt));
     }
 }
 
-const handleEvent = async (el, eventVal, evt) => {
+const handleEvent = async (el, eventVal, renderer, evt) => {
     if (evt) {
         evt.preventDefault();
     }
@@ -106,10 +117,9 @@ const handleEvent = async (el, eventVal, evt) => {
         return;
     }
 
-    const renderer = getRenderer(el);
-
     if (["FORM", "A"].includes(el.tagName)) {
         const response = await jtRequester(el);
+        // const response = await httpRequest(el);
         if (!response) {
             return;
         }
@@ -133,19 +143,19 @@ const handleEvent = async (el, eventVal, evt) => {
     actions(el, renderer, context);
 }
 
-function actions(el, renderer, context) {
+const actions = (el, renderer, context) => {
     if (renderer) {
         renderer(context);
     }
 
     const afters = resolveElsFromAttr(el, "jt-after") || [];
     for (const after of afters) {
-        //     const afterRenderer = getRenderer(after);
-        handleEvent(after, "");
+        const afterRenderer = getRenderer(after);
+        handleEvent(after, "", afterRenderer); // notify proxy/chain/after?
     }
 }
 
-function getRenderer(requester) {
+const getRenderer = (requester) => {
     const template = getTemplater(requester);
     if (!template) {
         return;
@@ -157,8 +167,8 @@ function getRenderer(requester) {
     return (data) => render(template, data, swapper, target);
 }
 
-function getTemplater(requester) {
-    if (requester.hasAttribute('jt-html')) {
+const getTemplater = (requester) => {
+    if (requester.hasAttribute("jt-html")) {
         return data => data;
     }
 
@@ -177,7 +187,7 @@ function getTemplater(requester) {
     return compiled;
 }
 
-function render(renderer, data, swapper, target) {
+const render = (renderer, data, swapper, target) => {
     const dom = renderer(data);
     if (!dom) {
         return;
@@ -188,21 +198,23 @@ function render(renderer, data, swapper, target) {
     JTML.apply(target);
 }
 
-function getSwapper(el) {
-    const swapType = el.getAttribute('jt-swap') || 'replace';
+const getSwapper = (el) => {
+    const swapType = el.getAttribute("jt-swap") || "replace";
     const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
     if (swapType && !isValidSwapType) {
         warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
     }
 
+    const isString = typeof dom === "string";
+
     return {
-        replace: (target, dom) => typeof dom === "string" ? target.innerHTML = dom : target.replaceChildren(dom),
-        append: (target, dom) => typeof dom === "string" ? target.innerHTML += dom : target.appendChild(dom),
-        prepend: (target, dom) => typeof dom === "string" ? target.innerHTML = dom + target.innerHTML : target.prepend(dom),
+        replace: (target, dom) => isString ? target.innerHTML = dom : target.replaceChildren(dom),
+        append: (target, dom) => isString ? target.innerHTML += dom : target.appendChild(dom),
+        prepend: (target, dom) => isString ? target.innerHTML = dom + target.innerHTML : target.prepend(dom),
     }[swapType];
 }
 
-async function httpRequest(requester) {
+const httpRequest = async (requester) => {
     const { url, options } = getFetchOptions(requester);
 
     try {
@@ -229,7 +241,7 @@ async function httpRequest(requester) {
     }
 }
 
-async function fnRunner(name, ...args) {
+const fnRunner = async (name, ...args) => {
     const fn = window[name];
     if (name && !fn) {
         warn(`[jtml] cannot find function ${name}`);
@@ -238,7 +250,8 @@ async function fnRunner(name, ...args) {
     return (fn && fn(...args));
 }
 
-async function jtRequester(requester) {
+const jtRequester = async (requester) => {
+    // deprecate?
     const loadingEl = resolveElFromAttr(requester, "jt-loading");
     const errorEl = resolveElFromAttr(requester, "jt-error");
 
@@ -264,7 +277,7 @@ async function jtRequester(requester) {
     }
 }
 
-function getFetchOptions(requester) {
+const getFetchOptions = (requester) => {
     let url = requester.getAttribute("action") || requester.getAttribute("href");
     const method = (requester.getAttribute("method") || "GET").toUpperCase();
 
@@ -297,7 +310,7 @@ function getFetchOptions(requester) {
     };
 };
 
-function extractRequestBody(el) {
+const extractRequestBody = (el) => {
     const formData = new FormData(el);
     const output = {};
 
@@ -307,7 +320,7 @@ function extractRequestBody(el) {
     return output;
 };
 
-function getResponseBody(res) {
+const getResponseBody = (res) => {
     if (res.headers.get("Content-Type").includes("text/html")) {
         return res.text();
     }
@@ -315,7 +328,7 @@ function getResponseBody(res) {
     return res.json();
 };
 
-function resolveElFromAttr(el, attr) {
+const resolveElFromAttr = (el, attr) => {
     const selector = el.getAttribute(attr);
     if (!selector) {
         return null;
@@ -330,7 +343,7 @@ function resolveElFromAttr(el, attr) {
     }
 }
 
-function resolveElsFromAttr(el, attr) {
+const resolveElsFromAttr = (el, attr) => {
     const selector = el.getAttribute(attr);
     if (!selector) {
         return null;
@@ -345,7 +358,7 @@ function resolveElsFromAttr(el, attr) {
     }
 }
 
-function showElement(el) {
+const showElement = (el) => {
     if (!el) {
         return;
     }
@@ -353,7 +366,7 @@ function showElement(el) {
     el.style.display = "";
 };
 
-function hideElement(el) {
+const hideElement = (el) => {
     if (!el) {
         return;
     }
@@ -367,7 +380,7 @@ if (document.readyState === "loading") {
     JTML.apply();
 }
 
-window.JTML = JTML;
+export default JTML;
 
 // 338
 // 670 peak

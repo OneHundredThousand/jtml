@@ -12,7 +12,7 @@ export default {
     file: `${outputPath}/jtml-min.js`,
     format: "iife", // or "iife" for browser
     sourcemap: !isProd,
-    name: "JTML"
+    name: "JTML",
   },
   watch: {
     include: "src/**",
@@ -32,8 +32,15 @@ export default {
         pure_getters: true,
         unsafe: true,
         pure_funcs: ['console.log', 'debugger'],
+        computed_props: true,
+        evaluate: true,
       },
-      mangle: true,
+      module: false,
+      mangle: {
+        properties: {
+          regex: /^\$/,
+        },
+      },
       format: { comments: false },
     }),
   ],
