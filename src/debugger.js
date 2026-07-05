@@ -1,4 +1,6 @@
-import { SupportedEvents } from "./events.js";
+// import { SupportedEvents } from "./events.js";
+
+
 
 const __DEVELOPMENT__ = process.env.NODE_ENV !== "production";
 
@@ -13,7 +15,8 @@ export function debug(root) {
     const params = url.searchParams;
 
     if (params.has("debug")) {
-        const actors = root.querySelectorAll(`[${[...SupportedEvents].join("],[")}]`);
+        // const actors = root.querySelectorAll(`[${[...SupportedEvents].join("],[")}]`);
+        const actors = root.querySelectorAll("[jt-actor]");
 
         const jtProps = {
             "jt-source": (actor) => actor.getAttribute("jt-source"),
@@ -32,9 +35,11 @@ export function debug(root) {
             "jt-request-error-fn": (actor) => window[actor.getAttribute("jt-request-error-fn")]
         };
 
-        for (const event of SupportedEvents) {
-            jtProps[event] = (actor) => window[actor.getAttribute(event)];
-        }
+        // for (const event of SupportedEvents) {
+        //     jtProps[event] = (actor) => window[actor.getAttribute(event)];
+        // }
+
+        // console.log(actors);
 
         for (const actor of actors) {
 
@@ -61,6 +66,7 @@ export function debug(root) {
     }
 }
 
+// add stacktace
 export function error(...data) {
     if (!__DEVELOPMENT__) {
         return;
@@ -75,6 +81,36 @@ export function warn(...data) {
     }
 
     console.warn(...data);
+}
+
+const resolveElFromAttr = (el, attr) => {
+    const selector = el.getAttribute(attr);
+    if (!selector) {
+        return null;
+    }
+
+    try {
+        return document.querySelector(selector);
+    } catch {
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
+        return null;
+    }
+}
+
+const resolveElsFromAttr = (el, attr) => {
+    const selector = el.getAttribute(attr);
+    if (!selector) {
+        return null;
+    }
+
+    try {
+        return document.querySelectorAll(selector);
+    } catch {
+        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
+        return null;
+    }
 }
 
 function serializeNode(node, depth = 0, highlightNode = null) {
