@@ -1,5 +1,5 @@
 import { compileTemplate } from "./template-engine.js";
-import { SupportedEvents } from "./events.js";
+// import { SupportedEvents } from "./events.js";
 import { JTStore } from "./store.js";
 import { debug, error, warn } from "./debugger.js";
 
@@ -10,13 +10,18 @@ import { debug, error, warn } from "./debugger.js";
 // show loading befor jt-fn?
 // global hooks
 
+const globalHooks = {
+    beforeRequest: [],
+    afterRequest: [],
+    requestError: [],
+};
+
 const JTML = {
     // globalHooks: [],
-    addListeners: (...list) => {
-        list.forEach(value => SupportedEvents.add(`jt-${value}`));
-    },
     apply: (root = document.body) => {
-        const actors = root.querySelectorAll(`[${[...SupportedEvents].join("],[")}]`);
+        debug(root);
+
+        const actors = root.querySelectorAll("[jt-actor]");
         for (const actor of actors) {
             if (actor._redered) {
                 continue;
@@ -24,21 +29,31 @@ const JTML = {
 
             bindEvents(actor);
             actor._redered = true;
-
-            debug(actor);
         }
     },
     run: (el) => {
         handleEvent(el, "");
     },
     store: JTStore,
-    // registerGlobalHook: (fn) => {
-    //     warnCb(() => typeof fn !== "function", `[jtml] cannot register non-function global hook ${fn}`);
+    registerGlobalHook: (fn) => {
+        if (!fn || typeof fn !== 'object') {
+            warn(`[jtml] cannot register ${fn}: must be object with optional properties { beforeRequest: () => {}, afterRequest: () => {}, requestError: () => {} }`);
+            return;
+        }
 
-    //     JTML.globalHooks.push(fn);
-    // }
+        for (const key in globalHooks) {
+            if (fn[key] === undefined) {
+                continue;
+            }
+            if (typeof fn[key] !== 'function') {
+                warn(`[jtml] cannot register ${key} from ${JSON.stringify(fn)}: ${key} is not a function`);
+                continue;
+            }
+
+            globalHooks[key].push(fn[key]);
+        }
+    }
 };
-
 
 // function bindNavigation(root) {
 //     const links = root.querySelectorAll("[jt-nav]");
@@ -86,25 +101,40 @@ const JTML = {
 const bindEvents = (el) => {
     // const renderer = getRenderer(el);
 
-    for (const jtEvent of SupportedEvents) {
-        const jtEventFnName = el.getAttribute(jtEvent);
+    const events = el.getAttribute("jt-actor").split(",").map(pair => pair.split(":"));
 
-        // console.log(jtEvent);
-
-        if (jtEventFnName === null) {
-            continue;
-        }
+    for (const [event, fnName] of events) {
 
         const renderer = getRenderer(el); //@TODO async?
 
-        if (jtEvent === "jt-load") {
-            handleEvent(el, jtEventFnName, renderer);
+        if (event === "load") {
+            handleEvent(el, fnName, renderer);
             continue;
         }
 
         // console.log(jtEvent.slice(3));
-        el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, renderer, evt));
+        el.addEventListener(event, (evt) => handleEvent(el, fnName, renderer, evt));
     }
+
+    // for (const jtEvent of SupportedEvents) {
+    //     const jtEventFnName = el.getAttribute(jtEvent);
+
+    //     // console.log(jtEvent);
+
+    //     if (jtEventFnName === null) {
+    //         continue;
+    //     }
+
+    //     const renderer = getRenderer(el); //@TODO async?
+
+    //     if (jtEvent === "jt-load") {
+    //         handleEvent(el, jtEventFnName, renderer);
+    //         continue;
+    //     }
+
+    //     // console.log(jtEvent.slice(3));
+    //     el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, renderer, evt));
+    // }
 }
 
 const handleEvent = async (el, eventVal, renderer, evt) => {
@@ -118,7 +148,7 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
     }
 
     if (["FORM", "A"].includes(el.tagName)) {
-        const response = await jtRequester(el);
+        const response = await httpRequest(el);
         // const response = await httpRequest(el);
         if (!response) {
             return;
@@ -218,12 +248,14 @@ const httpRequest = async (requester) => {
     const { url, options } = getFetchOptions(requester);
 
     try {
-        await fnRunner(requester.getAttribute("jt-pre-request-fn"), requester, options);
+        runGlobalHooks("beforeRequest", requester, options);
+        await fnRunner(requester.getAttribute("jt-request\\:before"), requester, options);
 
         const res = await fetch(url, options);
         const body = await getResponseBody(res);
 
-        await fnRunner(requester.getAttribute("jt-post-request-fn"), requester, res, body);
+        runGlobalHooks("afterRequest", requester, res, body);
+        await fnRunner(requester.getAttribute("jt-request\\:after"), requester, res, body);
 
         if (!res.ok) {
             throw {
@@ -234,10 +266,10 @@ const httpRequest = async (requester) => {
 
         return body;
     } catch (err) {
-        await fnRunner(requester.getAttribute("jt-request-error-fn"), requester, err);
+        runGlobalHooks("requestError", requester, err);
+        await fnRunner(requester.getAttribute("jt-request\\:error"), requester, err);
 
         error("[jtml] fetch failed:", url, err);
-        throw error;
     }
 }
 
@@ -250,32 +282,32 @@ const fnRunner = async (name, ...args) => {
     return (fn && fn(...args));
 }
 
-const jtRequester = async (requester) => {
-    // deprecate?
-    const loadingEl = resolveElFromAttr(requester, "jt-loading");
-    const errorEl = resolveElFromAttr(requester, "jt-error");
+// const jtRequester = async (requester) => {
+//     // deprecate?
+//     const loadingEl = resolveElFromAttr(requester, "jt-loading");
+//     const errorEl = resolveElFromAttr(requester, "jt-error");
 
-    showElement(loadingEl);
-    hideElement(errorEl);
+//     showElement(loadingEl);
+//     hideElement(errorEl);
 
-    try {
-        const data = await httpRequest(requester);
+//     try {
+//         const data = await httpRequest(requester);
 
-        hideElement(loadingEl);
-        hideElement(errorEl);
+//         hideElement(loadingEl);
+//         hideElement(errorEl);
 
-        return data;
+//         return data;
 
-    } catch (err) {
-        hideElement(loadingEl);
-        showElement(errorEl);
+//     } catch (err) {
+//         hideElement(loadingEl);
+//         showElement(errorEl);
 
-        // double logged?
+//         // double logged?
 
-        // console.error("[jtml] Form request failed:", err, "on actor", requester);
-        error("[jtml] Form request failed:", err, "on actor", requester);
-    }
-}
+//         // console.error("[jtml] Form request failed:", err, "on actor", requester);
+//         error("[jtml] Form request failed:", err, "on actor", requester);
+//     }
+// }
 
 const getFetchOptions = (requester) => {
     let url = requester.getAttribute("action") || requester.getAttribute("href");
@@ -358,21 +390,27 @@ const resolveElsFromAttr = (el, attr) => {
     }
 }
 
-const showElement = (el) => {
-    if (!el) {
-        return;
+const runGlobalHooks = (phase, ...params) => {
+    for (const hook of globalHooks[phase]) {
+        hook(...params);
     }
-
-    el.style.display = "";
 };
 
-const hideElement = (el) => {
-    if (!el) {
-        return;
-    }
+// const showElement = (el) => {
+//     if (!el) {
+//         return;
+//     }
 
-    el.style.display = "none";
-};
+//     el.style.display = "";
+// };
+
+// const hideElement = (el) => {
+//     if (!el) {
+//         return;
+//     }
+
+//     el.style.display = "none";
+// };
 
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => JTML.apply());

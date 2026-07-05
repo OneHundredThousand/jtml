@@ -14,8 +14,8 @@ const IF_TYPE = {
 };
 
 const INTERPOLATION_NODE_TYPE = {
-    Text: 1,
-    Path: 2,
+    Static: 1,
+    Expr: 2,
 };
 
 export const compileTemplate = (template) => {
@@ -107,7 +107,8 @@ const readConditionalChain = (children, start) => {
 };
 
 const toElement = (el) => {
-    const textInterpolation = compileInterpolations(el.getAttribute("jt-text"));
+    const text = el.getAttribute("jt-text");
+    const textInterpolation = text && compileInterpolations(text);
     const compiledBinders = compileBinders(el);
     return {
         $type: AST_TYPE.Element,
@@ -173,6 +174,10 @@ const compileBinders = (node) => {
     for (let attr of node.attributes) {
         if (attr.name.startsWith("jt-attr:")) {
             const [, realAttr] = attr.name.split(":");
+
+            if (!attr.value) {
+                continue;
+            }
 
             const text = compileInterpolations(attr.value);
             binders.push((el, ctx) => {
@@ -244,91 +249,81 @@ const compileIf = (node, attr) => {
     };
 }
 
-const compileInterpolations = (template) => {
-    if (template === "") {
-        return ctx => ctx;
-    }
-
-    if (!template || !template.length) {
-        return;
-    }
-
-    const ast = [];
-    const len = template.length;
-
+const compileInterpolations = (str) => {
+    const parts = [];
+    let staticStart = 0;   // start of current static run
     let i = 0;
-    let textStart = 0;
+    const len = str.length;
+
+    const flushStatic = (end) => {
+        if (end > staticStart) {
+            parts.push({ $type: INTERPOLATION_NODE_TYPE.Static, $value: str.slice(staticStart, end) });
+        }
+    };
 
     while (i < len) {
-        if (template[i] !== "{") {
-            i++;
+        const ch = str[i];
+
+        if (ch === "\\" && (str[i + 1] === "{" || str[i + 1] === "}")) {
+            // Escaped brace: flush static up to here, splice in literal char,
+            // then restart static run right after it.
+            flushStatic(i);
+            parts.push({ $type: INTERPOLATION_NODE_TYPE.Static, $value: str[i + 1] });
+            i += 2;
+            staticStart = i;
             continue;
         }
 
-        // flush text before "{"
-        if (i > textStart) {
-            ast.push({
-                $type: INTERPOLATION_NODE_TYPE.Text,
-                $value: template.slice(textStart, i)
-            });
+        if (ch === "{") {
+            flushStatic(i);
+            const exprStart = i + 1;
+            const close = str.indexOf("}", exprStart);
+
+            if (close === -1) {
+                throw new SyntaxError(
+                    `Unmatched "{" at position ${i} in template: ${JSON.stringify(str)}`
+                );
+            }
+
+            const expr = str.slice(exprStart, close).trim();
+            if (expr.length === 0) {
+                throw new SyntaxError(`Empty expression "{}" at position ${i}`);
+            }
+
+            parts.push({ type: INTERPOLATION_NODE_TYPE.Expr, $expr: expr });
+            i = close + 1;
+            staticStart = i;
+            continue;
         }
 
-        const exprStart = i + 1;
-        let j = exprStart;
-
-        while (j < len && template[j] !== "}") {
-            j++;
+        if (ch === "}") {
+            // A bare `}` with no matching `{` is malformed — strict mode rejects it
+            // rather than silently treating it as a literal.
+            throw new SyntaxError(`Unmatched "}" at position ${i}`);
         }
 
-        // unmatched "{"
-        if (j === len) {
-            ast.push({
-                $type: INTERPOLATION_NODE_TYPE.Text,
-                $value: template.slice(i)
-            });
-            return ast;
-        }
-
-        ast.push({
-            $type: INTERPOLATION_NODE_TYPE.Path,
-            $value: template.slice(exprStart, j)
-        });
-
-        i = j + 1;
-        textStart = i;
+        i++;
     }
 
-    // trailing text
-    if (textStart < len) {
-        ast.push({
-            $type: INTERPOLATION_NODE_TYPE.Text,
-            $value: template.slice(textStart)
-        });
-    }
+    flushStatic(len);
 
     return (ctx) => {
         let out = "";
 
-        if (ast.length === 1) {
-            const val = getNestedValue(ctx, ast[0].$value);
-            out += val !== undefined ? String(val) : ast[0].$value;
-        } else {
-            for (const node of ast) {
-                if (node.$type === INTERPOLATION_NODE_TYPE.Text) {
-                    out += node.$value;
-                    continue;
-                }
-
-                if (node.$type === INTERPOLATION_NODE_TYPE.Path) {
-                    const val = getNestedValue(ctx, node.$value);
-                    out += val !== undefined ? String(val) : node.$value;
-                }
-            }
+        if (parts.length === 1 && parts[0].$type === INTERPOLATION_NODE_TYPE.Static) {
+            const val = getNestedValue(ctx, parts[0].$value);
+            out += val ? String(parts[0].$value) : parts[0].$value;
+            return out;
         }
 
+        for (const part of parts) {
+            out += part.$type === INTERPOLATION_NODE_TYPE.Static
+                ? part.$value
+                : String(getNestedValue(ctx, part.$expr));
+        }
         return out;
     };
-}
+};
 
 const renderNode = (renderer, context, isDynamic) => {
     const { $type } = renderer;
@@ -398,7 +393,7 @@ const renderNode = (renderer, context, isDynamic) => {
 
         return clone;
     }
-}
+};
 
 const getNestedValue = (obj, paths) => {
     if (paths === "") {
@@ -415,7 +410,7 @@ const getNestedValue = (obj, paths) => {
     }
 
     return current;
-}
+};
 
 
 // 261, 223
