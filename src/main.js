@@ -9,7 +9,7 @@ import { handlers } from "./handlers.js";
 
 
 // show loading befor jt-fn?
-// global hooks
+// add constants for actor types and other custom attributes?
 
 const globalHooks = {
     beforeRequest: [],
@@ -207,7 +207,35 @@ const getRenderer = (requester) => {
 
 const getTemplater = (requester) => {
     if (requester.hasAttribute("jt-html")) {
-        return data => data;
+        return data => {
+            // 1. Initialize the DOMParser
+            const parser = new DOMParser();
+
+            // 2. Parse the HTML string into an inert DOM Document
+            const doc = parser.parseFromString(data, 'text/html');
+
+            // 3. Find all <script> tags
+            const scripts = doc.querySelectorAll('script');
+
+            // 4. Loop through and remove each script element
+            // @TODO validate this
+            scripts.forEach(script => {
+                script.remove();
+
+                const newScript = document.createElement("script");
+                newScript.innerHTML = script.innerHTML;
+
+                // @TODO validate this
+                document.body.appendChild(newScript);
+            });
+
+            console.log(doc.body.innerHTML);
+
+
+
+            // 5. Serialize the cleaned DOM back into a string
+            return doc.body.innerHTML;
+        };
     }
 
     const template = resolveElFromAttr(requester, "jt-render");
@@ -243,12 +271,12 @@ const getSwapper = (el) => {
         warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
     }
 
-    const isString = typeof dom === "string";
+    const isString = (dom) => typeof dom === "string";
 
     return {
-        replace: (target, dom) => isString ? target.innerHTML = dom : target.replaceChildren(dom),
-        append: (target, dom) => isString ? target.innerHTML += dom : target.appendChild(dom),
-        prepend: (target, dom) => isString ? target.innerHTML = dom + target.innerHTML : target.prepend(dom),
+        replace: (target, dom) => isString(dom) ? target.innerHTML = dom : target.replaceChildren(dom),
+        append: (target, dom) => isString(dom) ? target.innerHTML += dom : target.appendChild(dom),
+        prepend: (target, dom) => isString(dom) ? target.innerHTML = dom + target.innerHTML : target.prepend(dom),
     }[swapType];
 }
 
