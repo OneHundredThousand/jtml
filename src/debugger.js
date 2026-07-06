@@ -30,9 +30,9 @@ export function debug(root) {
             // "jt-loading": (actor) => resolveElFromAttr(actor, "jt-loading"),
             // "jt-error": (actor) => resolveElFromAttr(actor, "jt-error"),
 
-            "jt-pre-request-fn": (actor) => window[actor.getAttribute("jt-pre-request-fn")],
-            "jt-post-request-fn": (actor) => window[actor.getAttribute("jt-post-request-fn")],
-            "jt-request-error-fn": (actor) => window[actor.getAttribute("jt-request-error-fn")]
+            "jt-request:before": (actor) => window[actor.getAttribute("jt-request:before")],
+            "jt-request:after": (actor) => window[actor.getAttribute("jt-request:after")],
+            "jt-request:error": (actor) => window[actor.getAttribute("jt-request:error")]
         };
 
         // for (const event of SupportedEvents) {

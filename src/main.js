@@ -2,6 +2,7 @@ import { compileTemplate } from "./template-engine.js";
 // import { SupportedEvents } from "./events.js";
 import { JTStore } from "./store.js";
 import { debug, error, warn } from "./debugger.js";
+import { handlers } from "./handlers.js";
 
 // 5375
 // 5577
@@ -34,7 +35,8 @@ const JTML = {
     run: (el) => {
         handleEvent(el, "");
     },
-    store: JTStore,
+    store: JTStore, // manage private fields
+    handlers, // manage private fields
     registerGlobalHook: (fn) => {
         if (!fn || typeof fn !== 'object') {
             warn(`[jtml] cannot register ${fn}: must be object with optional properties { beforeRequest: () => {}, afterRequest: () => {}, requestError: () => {} }`);
@@ -101,7 +103,12 @@ const JTML = {
 const bindEvents = (el) => {
     // const renderer = getRenderer(el);
 
-    const events = el.getAttribute("jt-actor").split(",").map(pair => pair.split(":"));
+    const events = el.getAttribute("jt-actor")
+        .split(",")
+        .map(pair => {
+            let [event, fnName = ""] = pair.split(":");
+            return [event.trim(), fnName.trim()];
+        });
 
     for (const [event, fnName] of events) {
 
@@ -142,7 +149,8 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
         evt.preventDefault();
     }
 
-    const res = await fnRunner(eventVal, el, evt);
+    // const res = await fnRunner(eventVal, el, evt);
+    const res = await handlers.access(eventVal, el, evt);
     if (res === false) {
         return;
     }
@@ -249,13 +257,15 @@ const httpRequest = async (requester) => {
 
     try {
         runGlobalHooks("beforeRequest", requester, options);
-        await fnRunner(requester.getAttribute("jt-request\\:before"), requester, options);
+        // await fnRunner(requester.getAttribute("jt-request\\:before"), requester, options);
+        await handlers.access(requester.getAttribute("jt-request\\:before"), requester, options);
 
         const res = await fetch(url, options);
         const body = await getResponseBody(res);
 
         runGlobalHooks("afterRequest", requester, res, body);
-        await fnRunner(requester.getAttribute("jt-request\\:after"), requester, res, body);
+        // await fnRunner(requester.getAttribute("jt-request\\:after"), requester, res, body);
+        await handlers.access(requester.getAttribute("jt-request\\:after"), requester, res, body);
 
         if (!res.ok) {
             throw {
@@ -267,20 +277,21 @@ const httpRequest = async (requester) => {
         return body;
     } catch (err) {
         runGlobalHooks("requestError", requester, err);
-        await fnRunner(requester.getAttribute("jt-request\\:error"), requester, err);
+        // await fnRunner(requester.getAttribute("jt-request\\:error"), requester, err);
+        await handlers.access(requester.getAttribute("jt-request\\:error"), requester, err);
 
         error("[jtml] fetch failed:", url, err);
     }
 }
 
-const fnRunner = async (name, ...args) => {
-    const fn = window[name];
-    if (name && !fn) {
-        warn(`[jtml] cannot find function ${name}`);
-    }
+// const fnRunner = async (name, ...args) => {
+//     const fn = handlers.access(name, ...args);
+//     if (name && !fn) {
+//         warn(`[jtml] cannot find function ${name}`);
+//     }
 
-    return (fn && fn(...args));
-}
+//     return (fn && fn(...args));
+// }
 
 // const jtRequester = async (requester) => {
 //     // deprecate?
