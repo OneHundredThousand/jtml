@@ -312,7 +312,7 @@ const compileInterpolations = (str) => {
 
         if (parts.length === 1 && parts[0].$type === INTERPOLATION_NODE_TYPE.Static) {
             const val = getNestedValue(ctx, parts[0].$value);
-            out += val ? String(parts[0].$value) : parts[0].$value;
+            out += val ? String(val) : parts[0].$value;
             return out;
         }
 

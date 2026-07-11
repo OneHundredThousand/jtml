@@ -1,28 +1,28 @@
-// validate this
-export const JTStore = {
-    data: {},
+const data = {};
 
-    add: (key, value) => {
-        JTStore.data[key] = value;
+// validate this
+export const store = {
+    add: (fn) => {
+        data[fn.name] = fn();
+        return () => delete data[fn.name];
     },
 
-    get: (key) => {
-        return JTStore.data[key];
+    set: (path, value) => {
+        const [key, prop] = path.split(".");
+        const obj = data[key];
+        obj[path] = value;
+    },
+
+    get: (path) => {
+        if (!path) {
+            return;
+        }
+
+        const [key, prop] = path.split(".");
+        return data[key][prop];
     },
 
     // remove(key) {
     //     delete this.data[key];
     // },
-
-    // clearPrefix(prefix) {
-    //     for (const key in this.data) {
-    //         if (key.startsWith(prefix)) {
-    //             delete this.data[key];
-    //         }
-    //     }
-    // },
-
-    // clearAll() {
-    //     this.data = {};
-    // }
 };

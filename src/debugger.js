@@ -50,7 +50,7 @@ export function debug(root) {
             }
 
             const props = {
-                actor,
+                actor, // add details which event
             };
 
             for (const jtProp in jtProps) {

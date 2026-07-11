@@ -1,12 +1,12 @@
-export const handlers = {
-    handlers: new Map(),
-    add: (classObj) => {
-        if (handlers.handlers.has(classObj)) {
-            return;
-        }
 
+const storedHandlers = {};
+
+export const handlers = {
+    add: (classObj) => {
         const handler = new classObj();
-        handlers.handlers.set(handler.constructor.name, handler);
+        storedHandlers[handler.constructor.name] = handler;
+
+        return () => delete storedHandlers[handler.constructor.name];
     },
     access: async (path, ...params) => {
         if (!path) {
@@ -14,8 +14,7 @@ export const handlers = {
         }
 
         const [constructor, method] = path.split(".");
-
-        const handler = handlers.handlers.get(constructor);
+        const handler = storedHandlers[constructor];
         if (!handler) {
             return;
         }
