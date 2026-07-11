@@ -14,7 +14,6 @@ JTML is a lightweight, attribute-driven JavaScript micro-library that turns plai
 ## ✨ Core Ideas
 
 - HTML defines structure and behavior  
-- One actor element = one action  
 - Templates stay in `<template>`  
 - JSON is the default data shape  
 - Explicit over implicit  
@@ -26,19 +25,19 @@ JTML enhances real HTML — it doesn’t replace it.
 ## 🚀 Quick Start
 
 ```html
-<form 
+<form
   action="/posts"
   method="GET"
+  jt-actor="load"
   jt-render="#posts-template"
   jt-target="#output"
-  jt-load
 >
 </form>
 
 <template id="posts-template">
   <ul>
-    <li jt-foreach="items">
-      <span jt-text="{title}"></span>
+    <li jt-foreach="items as item">
+      <span jt-text="{item.title}"></span>
     </li>
   </ul>
 </template>
@@ -48,7 +47,7 @@ JTML enhances real HTML — it doesn’t replace it.
 <script src="jtml.js"></script>
 ```
 
-If `/posts` returns JSON like:
+If `/posts` returns:
 
 ```json
 {
@@ -59,230 +58,265 @@ If `/posts` returns JSON like:
 }
 ```
 
-JTML renders it automatically.
+JTML fetches, then renders the template into `#output`.
 
 ---
 
-## ⚡ Supported Events
+## ⚡ Actors (`jt-actor`)
 
-JTML binds behavior using `jt-*` attributes.
-
-- `jt-click`
-- `jt-submit`
-- `jt-input`
-- `jt-change`
-- `jt-load`
-
-Example:
+Behavior is bound with a single attribute:
 
 ```html
-<button 
-  jt-click="handleClick"
-  jt-render="#result"
-  jt-target="#out">
-  Click
+jt-actor="event:Handler.method, anotherEvent"
+```
+
+- `event` — any native DOM event name, or the special `load` (runs once when the actor is bound)
+- `Handler.method` — optional. Path to a registered handler method. If omitted the default action runs (fetch for forms/anchors, or render from store).
+
+Examples:
+
+```html
+<button jt-actor="click:App.onClick" jt-render="#tpl" jt-target="#out">
+  Go
 </button>
-```
 
-```javascript
-function handleClick(el, event) {
-  console.log("clicked");
-}
-```
-
-If the handler returns `false`, rendering is skipped.  
-If it returns a `Promise`, rendering waits.
-
----
-
-## 🔁 Forms & Anchors (Requests)
-
-Forms and anchors automatically use `fetch()`.
-
-```html
-<form
-  action="/users"
-  method="POST"
-  jt-render="#user-template"
-  jt-target="#users"
-  jt-store="usersData"
->
+<form jt-actor="submit" action="/save" method="POST" jt-render="#result">
+  ...
 </form>
+
+<div jt-actor="load" jt-source="user" jt-render="#profile"></div>
 ```
 
-### Behavior
+```js
+class App {
+  onClick(el, evt) {
+    // return false to cancel rendering
+    // may return a Promise
+  }
+}
+JTML.handlers.add(App);
+```
 
-- `GET` → query string via `URLSearchParams`
-- `POST`, `PUT`, `PATCH` → JSON body
+Multiple events: `jt-actor="click:App.a, input:App.b"`
 
-Response auto-parsed:
-
-- `application/json` → `res.json()`
-- `text/html` → `res.text()`
+`JTML.run(el)` manually triggers an actor (with empty handler path).
 
 ---
 
-## 🧩 Rendering (`jt-render`)
+## Forms & Anchors (HTTP)
 
-`jt-render` points to a `<template>`.
+When the actor element is a `<form>` or `<a>`, JTML performs a `fetch` on the bound event.
+
+- URL from `action` or `href`
+- Method from `method` (defaults to `GET`)
+- `POST` / `PUT` / `PATCH` on forms → JSON body built from `FormData`
+- `GET` forms → query string via `URLSearchParams`
+
+Response body:
+
+- `Content-Type: text/html` → `text()`
+- otherwise → `json()`
+
+Optional:
 
 ```html
-<template id="user-template">
-  <div>
-    <h3 jt-text="{name}"></h3>
-    <p jt-text="{email}"></p>
-  </div>
-</template>
+jt-store="posts"          <!-- store.set("posts", body) after success -->
+jt-request:before="App.before"
+jt-request:after="App.after"
+jt-request:error="App.onError"
 ```
 
-### Supported Template Directives
+---
 
-- `jt-text="{path.to.value}"`
-- `jt-foreach="items"`
-- `jt-if="count gt 0"`
-- `jt-attr:href="{url}"`
+## 🧩 Rendering
 
-### Conditional Operators
+| Attribute     | Description                                      | Default     |
+|---------------|--------------------------------------------------|-------------|
+| `jt-render`   | CSS selector of a `<template>`                   | —           |
+| `jt-html`     | Treat response as raw HTML (parse + run scripts) | —           |
+| `jt-target`   | Where to put the result                          | the actor itself |
+| `jt-swap`     | `replace` / `append` / `prepend`                 | `replace`   |
+| `jt-after`    | CSS selector(s) of other actors to run next      | —           |
+| `jt-source`   | Store path used as render context (non-HTTP)     | —           |
 
-- `eq`
-- `neq`
-- `gt`
-- `lt`
-- `gte`
-- `lte`
+After a render, JTML automatically re-applies itself to the new content so nested actors work.
 
-Example:
+`jt-html` is useful when the server returns a full HTML fragment (scripts inside are extracted and executed after insertion).
+
+---
+
+## Templates
+
+Point `jt-render` at a `<template>`. Directives live as attributes on elements inside it.
+
+### Text & attributes
+
+```html
+<span jt-text="{user.name}"></span>
+<a jt-attr:href="{url}" jt-text="Open {title}"></a>
+```
+
+- `{path.to.value}` — nested access
+- Mixed static + expressions: `Hello {name}!`
+- Escape braces: `\{` or `\}`
+
+### Loops
+
+```html
+<li jt-foreach="items as item">
+  <span jt-text="{item.title}"></span>
+  <span jt-text="{item.count}"></span>
+</li>
+```
+
+`as alias` is required so properties are reached via `{alias.prop}`.
+
+The loop element itself supports `jt-text` and `jt-attr:*`.
+
+### Conditionals
 
 ```html
 <div jt-if="count gt 0">
   Has items
 </div>
-```
-
-Templates are compiled once and cached automatically.
-
----
-
-## 🎯 Targets (`jt-target`)
-
-```html
-jt-target="#output"
-```
-
-If omitted, rendering happens in place.
-
----
-
-## 🔄 Swap Strategies (`jt-swap`)
-
-Controls how output is inserted:
-
-| Value   | Behavior                     |
-|---------|-----------------------------|
-| replace | Replace children (default)  |
-| append  | Append output               |
-| prepend | Prepend output              |
-
-Example:
-
-```html
-<form jt-swap="append">...</form>
-```
-
----
-
-## 🧠 Global Store
-
-JTML includes a tiny key/value store.
-
-```javascript
-JTML.store.add("user", { name: "Arthur" });
-
-const user = JTML.store.get("user");
-```
-
-Use it via `jt-source`:
-
-```html
-<div 
-  jt-source="user"
-  jt-render="#profile-template">
+<div jt-elseif="count eq 0">
+  Empty
+</div>
+<div jt-else>
+  Unknown
 </div>
 ```
 
-The stored object becomes the render context.
+Operators: `eq` `neq` `gt` `lt` `gte` `lte`
 
----
-
-## ⏳ Loading & Error States
+Also supports bare truthy check or `!path`:
 
 ```html
-<form
-  jt-loading="#loading"
-  jt-error="#error">
-</form>
+<div jt-if="user"></div>
+<div jt-if="!error"></div>
 ```
 
-- `jt-loading` → shown during request  
-- `jt-error` → shown if request fails  
+Literals: `'string'`, `true`, `false`, `null`, `undefined`, numbers.
+
+`jt-if` / `jt-elseif` / `jt-else` must be consecutive siblings.
+
+Templates are compiled once and cached on the `<template>` element.
 
 ---
 
-## 🪝 Lifecycle Hooks
+## Store
 
-Hooks are plain global functions.
+Tiny nested key/value store.
+
+```js
+// Register a named store (function name becomes the root key)
+function user() {
+  return { name: "Arthur", posts: [] };
+}
+const dispose = JTML.store.add(user);
+
+// Set / get with dotted paths
+JTML.store.set("user.name", "Dent");
+JTML.store.set("user.posts", [{ title: "42" }]);
+
+const name = JTML.store.get("user.name");
+const whole = JTML.store.get("user");
+```
+
+In HTML:
 
 ```html
-<form
-  jt-pre-request-fn="beforeReq"
-  jt-post-request-fn="afterReq"
-  jt-request-error-fn="onError">
-</form>
-```
+<!-- after a successful request -->
+<form jt-store="posts" ...></form>
 
-```javascript
-function beforeReq(el, options) {}
-function afterReq(el, response, body) {}
-function onError(el, error) {}
+<!-- later, re-render from store -->
+<div
+  jt-actor="load"
+  jt-source="posts"
+  jt-render="#list-template"
+  jt-target="#list">
+</div>
 ```
-
-No framework lifecycle. Just functions.
 
 ---
 
-## 🔍 Debug Mode
+## Handlers
 
-Enable via query string:
+Custom logic lives in plain classes.
+
+```js
+class App {
+  before(el, options) {
+    options.headers["X-Token"] = "secret";
+  }
+
+  after(el, res, body) {
+    console.log(res.status, body);
+  }
+
+  onError(el, err) {
+    console.error(err);
+  }
+
+  onClick(el, evt) {
+    if (!confirm("Sure?")) return false; // cancel
+  }
+}
+
+JTML.handlers.add(App);
+// returns a disposer that removes the handler
+```
+
+Reference them from attributes:
 
 ```html
-<script src="jtml.js?debug"></script>
+jt-actor="click:App.onClick"
+jt-request:before="App.before"
+jt-request:after="App.after"
+jt-request:error="App.onError"
 ```
-
-Optional flags:
-
-- `?debug`
-- `?debug&debug-only`
-- `?debug&debug-verbose`
-
-Logs actor processing details to the console.
 
 ---
 
-## 🔄 Manual Re-Apply
+## Global Hooks
 
-JTML runs automatically on `DOMContentLoaded`.
+For cross-cutting request concerns:
 
-You can manually re-bind:
-
-```javascript
-JTML.apply();
+```js
+JTML.globalHooks.register({
+  beforeRequest(el, options) { /* ... */ },
+  afterRequest(el, res, body) { /* ... */ },
+  requestError(el, err) { /* ... */ },
+});
 ```
 
-Or apply to a subtree:
+They run for every HTTP request, in addition to any per-actor `jt-request:*` handlers.
 
-```javascript
-JTML.apply(someElement);
+---
+
+## Debug Mode
+
+```html
+<script type="module" src="./main.js?debug"></script>
 ```
+
+Flags (query params on the script URL):
+
+- `?debug` — log every actor that is processed
+- `?debug&debug-only` — only actors that also have `jt-debug-only`
+- `?debug&debug-verbose` — include props even when the attribute is absent
+
+---
+
+## Manual Control
+
+```js
+JTML.apply();                 // whole document
+JTML.apply(someElement);      // subtree only
+JTML.run(document.querySelector("#foo")); // force an actor
+```
+
+Actors already processed are skipped (`_rendered` flag).
 
 ---
 
@@ -290,19 +324,19 @@ JTML.apply(someElement);
 
 JTML is intentionally not a framework.
 
-- No component system  
-- No router  
-- No global state management  
-- No hidden diffing  
-- No magical reactivity  
+- No component system
+- No router
+- No global reactivity
+- No hidden diffing or lifecycle magic
 
 It enhances HTML with predictable, explicit behavior.
 
-If things get complicated, use plain JavaScript.  
-JTML doesn’t try to compete with full frameworks — it avoids becoming one.
+It just adds a few attributes that make HTML a bit more useful for the common “fetch JSON → fill a template” pattern.
+
+If things get complicated, drop back to plain JavaScript. JTML stays out of the way.
 
 ---
 
-## 📄 License
+## License
 
 MIT
