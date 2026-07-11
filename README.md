@@ -211,7 +211,7 @@ Tiny nested key/value store.
 ```js
 // Register a named store (function name becomes the root key)
 function user() {
-  return { name: "Arthur", posts: [] };
+  return { name: "One Hundred", posts: [] };
 }
 const dispose = JTML.store.add(user);
 
@@ -313,7 +313,7 @@ Flags (query params on the script URL):
 ```js
 JTML.apply();                 // whole document
 JTML.apply(someElement);      // subtree only
-JTML.run(document.querySelector("#foo")); // force an actor
+JTML.run(document.querySelector("#foo")); // run an actor
 ```
 
 Actors already processed are skipped (`_rendered` flag).
