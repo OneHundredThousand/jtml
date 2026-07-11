@@ -1,13 +1,9 @@
-// import { SupportedEvents } from "./events.js";
-
-
-
-const __DEVELOPMENT__ = process.env.NODE_ENV !== "production";
+const __DEV__ = process.env.NODE_ENV !== "production";
 
 const script = document.currentScript;
 
 export function debug(root) {
-    if (!__DEVELOPMENT__) {
+    if (!__DEV__) {
         return;
     }
 
@@ -15,7 +11,6 @@ export function debug(root) {
     const params = url.searchParams;
 
     if (params.has("debug")) {
-        // const actors = root.querySelectorAll(`[${[...SupportedEvents].join("],[")}]`);
         const actors = root.querySelectorAll("[jt-actor]");
 
         const jtProps = {
@@ -27,19 +22,11 @@ export function debug(root) {
             "jt-swap": (actor) => actor.getAttribute("jt-swap") || "replace",
             "jt-after": (actor) => resolveElsFromAttr(actor, "jt-after"),
 
-            // "jt-loading": (actor) => resolveElFromAttr(actor, "jt-loading"),
-            // "jt-error": (actor) => resolveElFromAttr(actor, "jt-error"),
-
+            // @TODO fix access
             "jt-request:before": (actor) => window[actor.getAttribute("jt-request:before")],
             "jt-request:after": (actor) => window[actor.getAttribute("jt-request:after")],
             "jt-request:error": (actor) => window[actor.getAttribute("jt-request:error")]
         };
-
-        // for (const event of SupportedEvents) {
-        //     jtProps[event] = (actor) => window[actor.getAttribute(event)];
-        // }
-
-        // console.log(actors);
 
         for (const actor of actors) {
 
@@ -50,7 +37,10 @@ export function debug(root) {
             }
 
             const props = {
-                actor, // add details which event
+                actor: {
+                    event: actor.getAttribute("jt-actor"),
+                    element: actor,
+                },
             };
 
             for (const jtProp in jtProps) {
@@ -66,9 +56,9 @@ export function debug(root) {
     }
 }
 
-// add stacktace
+// @RODO add stacktace
 export function error(...data) {
-    if (!__DEVELOPMENT__) {
+    if (!__DEV__) {
         return;
     }
 
@@ -76,7 +66,7 @@ export function error(...data) {
 }
 
 export function warn(...data) {
-    if (!__DEVELOPMENT__) {
+    if (!__DEV__) {
         return;
     }
 
@@ -92,7 +82,6 @@ const resolveElFromAttr = (el, attr) => {
     try {
         return document.querySelector(selector);
     } catch {
-        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
         warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
@@ -107,38 +96,9 @@ const resolveElsFromAttr = (el, attr) => {
     try {
         return document.querySelectorAll(selector);
     } catch {
-        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
         warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
-}
-
-function serializeNode(node, depth = 0, highlightNode = null) {
-    const indent = '  '.repeat(depth);
-    const lines = [];
-
-    if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent.trim();
-        if (text) lines.push(`${indent}"${text}"`);
-        return lines;
-    }
-
-    if (node.nodeType !== Node.ELEMENT_NODE) return lines;
-
-    const attrs = Array.from(node.attributes || [])
-        .map(a => `${a.name}="${a.value}"`)
-        .join(' ');
-
-    const tag = node.tagName.toLowerCase();
-    const isTarget = node === highlightNode;
-    const line = `${indent}<${tag}${attrs ? ' ' + attrs : ''}>${isTarget ? '   <-- HERE' : ''}`;
-    lines.push(line);
-
-    for (const child of node.childNodes) {
-        lines.push(...serializeNode(child, depth + 1, highlightNode));
-    }
-
-    return lines;
 }
 
 /*
@@ -149,29 +109,57 @@ function serializeNode(node, depth = 0, highlightNode = null) {
         for (const child of root.childNodes) {
             lines.push(...serializeNode(child, 0, highlight));
         }
-        const tree = lines.join('\n');
+        const tree = lines.join("\n");
 
         // text tree: readable, copy-pasteable, safe to paste into an issue
-        console.warn(`${message || 'Template structure error:'}\n\n${tree}`);
+        console.warn(`${message || "Template structure error:"}\n\n${tree}`);
         // live reference: clickable in devtools, expandable, not serializable
-        if (highlight) console.warn('Offending element (click to inspect):', highlight);
+        if (highlight) console.warn("Offending element (click to inspect):", highlight);
 
         return tree; // also useful for showing in-page, or asserting on in tests
     }
 
     // --- Demo wiring: reuses the same kind of validation error as before ---
     function findBadIfNode(root) {
-        return root.querySelector('[data-if]');
+        return root.querySelector("[data-if]");
+    }
+
+    function serializeNode(node, depth = 0, highlightNode = null) {
+        const indent = "  ".repeat(depth);
+        const lines = [];
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim();
+            if (text) lines.push(`${indent}"${text}"`);
+            return lines;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return lines;
+
+        const attrs = Array.from(node.attributes || [])
+            .map(a => `${a.name}="${a.value}"`)
+            .join(" ");
+
+        const tag = node.tagName.toLowerCase();
+        const isTarget = node === highlightNode;
+        const line = `${indent}<${tag}${attrs ? " " + attrs : ""}>${isTarget ? "   <-- HERE" : ""}`;
+        lines.push(line);
+
+        for (const child of node.childNodes) {
+            lines.push(...serializeNode(child, depth + 1, highlightNode));
+        }
+
+        return lines;
     }
 
     function run() {
-        const tpl = document.getElementById('tpl');
+        const tpl = document.getElementById("tpl");
         const bad = findBadIfNode(tpl.content);
         const tree = warnTemplateStructure(tpl, {
             highlight: bad,
-            message: `data-if="${bad.getAttribute('data-if')}" is missing a comparison value (rhs)`
+            message: `data-if="${bad.getAttribute("data-if")}" is missing a comparison value (rhs)`
         });
-        document.getElementById('out').textContent = tree;
+        document.getElementById("out").textContent = tree;
     }
 
     run();

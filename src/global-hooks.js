@@ -1,4 +1,4 @@
-import { warn } from './debugger.js';
+import { warn } from "./debugger";
 
 const hooks = {
     beforeRequest: [],
@@ -9,7 +9,7 @@ const hooks = {
 // @TODO Simplify API
 export const globalHooks = {
     register: (fn) => {
-        if (!fn || typeof fn !== 'object') {
+        if (!fn || typeof fn !== "object") {
             warn(`[jtml] cannot register ${fn}: must be object with optional properties { beforeRequest: () => {}, afterRequest: () => {}, requestError: () => {} }`);
             return;
         }
@@ -18,7 +18,7 @@ export const globalHooks = {
             if (fn[key] === undefined) {
                 continue;
             }
-            if (typeof fn[key] !== 'function') {
+            if (typeof fn[key] !== "function") {
                 warn(`[jtml] cannot register ${key} from ${JSON.stringify(fn)}: ${key} is not a function`);
                 continue;
             }
@@ -26,9 +26,10 @@ export const globalHooks = {
             hooks[key].push(fn[key]);
         }
     },
-    run: (phase, ...params) => {
-        for (const hook of hooks[phase]) {
-            hook(...params);
-        }
-    },
+};
+
+export const run = (phase, ...params) => {
+    for (const hook of hooks[phase]) {
+        hook(...params);
+    }
 };

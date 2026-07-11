@@ -1,10 +1,10 @@
-import { compileTemplate } from "./template-engine.js";
-import { store } from "./store.js";
-import { debug, error, warn } from "./debugger.js";
-import { handlers } from "./handlers.js";
-import { globalHooks } from "./global-hooks.js";
+import { compileTemplate } from "./template-engine";
+import { store } from "./store";
+import { debug, error, warn } from "./debugger";
+import { handlers } from "./handlers";
+import { globalHooks, run as runHook } from "./global-hooks";
 
-// show loading befor jt-fn?
+// @TODO Add constants for custom attributes
 
 const JTML = {
     apply: (root = document.body) => {
@@ -20,9 +20,7 @@ const JTML = {
             actor._redered = true;
         }
     },
-    run: (el) => {
-        handleEvent(el, "");
-    },
+    run: (el) => handleEvent(el, ""),
     store,
     handlers,
     globalHooks,
@@ -90,7 +88,7 @@ const actions = (el, renderer, context) => {
         renderer(context);
     }
 
-    const afters = resolveElsFromAttr(el, "jt-after") || [];
+    const afters = resolveElFromAttr(el, "jt-after", true) ?? [];
     for (const after of afters) {
         const afterRenderer = getRenderer(after);
         handleEvent(after, "", afterRenderer); // @TODO notify proxy/chain/after?
@@ -113,7 +111,7 @@ const getTemplater = (requester) => {
     if (requester.hasAttribute("jt-html")) {
         return data => {
             const parser = new DOMParser();
-            const doc = parser.parseFromString(data, 'text/html');
+            const doc = parser.parseFromString(data, "text/html");
 
             const scripts = [];
             const domScripts = doc.body.querySelectorAll("script");
@@ -188,14 +186,15 @@ const httpRequest = async (requester) => {
     const { url, options } = getFetchOptions(requester);
 
     try {
-        globalHooks.run("beforeRequest", requester, options);
-        await handlers.access(requester.getAttribute("jt-request\\:before"), requester, options);
+        runHook("beforeRequest", requester, options);
+        await handlers.access(requester.getAttribute("jt-request:before"), requester, options);
 
         const res = await fetch(url, options);
         const body = await getResponseBody(res);
 
-        globalHooks.run("afterRequest", requester, res, body);
-        await handlers.access(requester.getAttribute("jt-request\\:after"), requester, res, body);
+        runHook("afterRequest", requester, res, body);
+        console.log(requester.getAttribute("jt-request:after"));
+        await handlers.access(requester.getAttribute("jt-request:after"), requester, res, body);
 
         if (!res.ok) {
             throw {
@@ -206,7 +205,7 @@ const httpRequest = async (requester) => {
 
         return body;
     } catch (err) {
-        globalHooks.run("requestError", requester, err);
+        runHook("requestError", requester, err);
         await handlers.access(requester.getAttribute("jt-request\\:error"), requester, err);
 
         error("[jtml] fetch failed:", url, err);
@@ -264,29 +263,14 @@ const getResponseBody = (res) => {
     return res.json();
 };
 
-const resolveElFromAttr = (el, attr) => {
+const resolveElFromAttr = (el, attr, all = false) => {
     const selector = el.getAttribute(attr);
     if (!selector) {
         return null;
     }
 
     try {
-        return document.querySelector(selector);
-    } catch {
-        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
-        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
-        return null;
-    }
-}
-
-const resolveElsFromAttr = (el, attr) => {
-    const selector = el.getAttribute(attr);
-    if (!selector) {
-        return null;
-    }
-
-    try {
-        return document.querySelectorAll(selector);
+        return all ? document.querySelectorAll(selector) : document.querySelector(selector);
     } catch {
         warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
