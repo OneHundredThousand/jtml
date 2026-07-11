@@ -211,12 +211,12 @@ Tiny nested key/value store.
 ```js
 // Register a named store (function name becomes the root key)
 function user() {
-  return { name: "One Hundred", posts: [] };
+  return { name: "Arthur", posts: [] };
 }
 const dispose = JTML.store.add(user);
 
 // Set / get with dotted paths
-JTML.store.set("user.name", "Dent");
+JTML.store.set("user.name", "Two Hundred");
 JTML.store.set("user.posts", [{ title: "42" }]);
 
 const name = JTML.store.get("user.name");
@@ -313,7 +313,7 @@ Flags (query params on the script URL):
 ```js
 JTML.apply();                 // whole document
 JTML.apply(someElement);      // subtree only
-JTML.run(document.querySelector("#foo")); // run an actor
+JTML.run(document.querySelector("#foo")); // force an actor
 ```
 
 Actors already processed are skipped (`_rendered` flag).
