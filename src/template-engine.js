@@ -236,7 +236,7 @@ const compileIf = (node, attr) => {
         } else if (!isNaN(Number(val))) {
             return () => Number(val);
         }
-        return (ctx) => ctx[val];
+        return (ctx) => getNestedValue(ctx, val);
     };
 
     const leftAccessor = getExpression(left);
