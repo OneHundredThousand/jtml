@@ -1,4 +1,5 @@
-import { warn } from "./debugger";
+import { getNestedValue } from "./utils";
+import { error, warn } from "./debugger";
 
 const AST_TYPE = {
     Element: 1,
@@ -48,21 +49,21 @@ const createRenderers = (elems) => {
             continue;
         }
 
-        if (el.hasAttribute('jt-foreach')) {
+        if (el.hasAttribute("jt-foreach")) {
             nodes.push(toForeach(el));
             continue;
         }
 
-        if (el.hasAttribute('jt-if')) {
+        if (el.hasAttribute("jt-if")) {
             const chain = readConditionalChain(elems, i);
             nodes.push(toIf(chain));
             i = chain.$nextIndex - 1;
             continue;
         }
 
-        if (el.hasAttribute('jt-elseif') || el.hasAttribute('jt-else')) {
-            const found = el.hasAttribute('jt-elseif') ? 'jt-elseif' : 'jt-else';
-            const value = el.hasAttribute('jt-elseif') ? el.getAttribute('jt-elseif') : '';
+        if (el.hasAttribute("jt-elseif") || el.hasAttribute("jt-else")) {
+            const found = el.hasAttribute("jt-elseif") ? "jt-elseif" : "jt-else";
+            const value = el.hasAttribute("jt-elseif") ? el.getAttribute("jt-elseif") : "";
             warn(`[jtml] ${found}="${value}" with no preceding "jt-if"`, elems[i]);
         }
 
@@ -84,13 +85,13 @@ const readConditionalChain = (children, start) => {
             continue;
         }
 
-        if (el.hasAttribute('jt-elseif')) {
+        if (el.hasAttribute("jt-elseif")) {
             if (sawElse) {
                 warn(`[jtml] "elseif" cannot follow "else"`, children[i]);
                 continue;
             }
             branches.push(toBranch(children[i], IF_TYPE.ElseIf));
-        } else if (el.hasAttribute('jt-else')) {
+        } else if (el.hasAttribute("jt-else")) {
             if (sawElse) {
                 warn(`[jtml] Only one "else" allowed per chain`, children[i]);
                 continue;
@@ -168,6 +169,7 @@ const toForeach = (node) => {
     };
 };
 
+// @TODO Review implementation
 const compileBinders = (node) => {
     const binders = [];
 
@@ -280,14 +282,14 @@ const compileInterpolations = (str) => {
             const close = str.indexOf("}", exprStart);
 
             if (close === -1) {
-                throw new SyntaxError(
-                    `Unmatched "{" at position ${i} in template: ${JSON.stringify(str)}`
-                );
+                error(`Unmatched "{" at position ${i} in template: ${JSON.stringify(str)}`)
+                return;
             }
 
             const expr = str.slice(exprStart, close).trim();
             if (expr.length === 0) {
-                throw new SyntaxError(`Empty expression "{}" at position ${i}`);
+                error(`Empty expression "{}" at position ${i}`)
+                return;
             }
 
             parts.push({ type: INTERPOLATION_NODE_TYPE.Expr, $expr: expr });
@@ -299,7 +301,8 @@ const compileInterpolations = (str) => {
         if (ch === "}") {
             // A bare `}` with no matching `{` is malformed — strict mode rejects it
             // rather than silently treating it as a literal.
-            throw new SyntaxError(`Unmatched "}" at position ${i}`);
+            error(`Unmatched "}" at position ${i}`);
+            return;
         }
 
         i++;
@@ -394,24 +397,6 @@ const renderNode = (renderer, context, isDynamic) => {
         return clone;
     }
 };
-
-const getNestedValue = (obj, paths) => {
-    if (paths === "") {
-        return obj;
-    }
-
-    let current = obj;
-    for (const path of paths.split('.')) {
-        if (!current) {
-            return undefined;
-        }
-
-        current = current[path];
-    }
-
-    return current;
-};
-
 
 // 261, 223
 // 366
