@@ -1,23 +1,12 @@
 import { compileTemplate } from "./template-engine.js";
-// import { SupportedEvents } from "./events.js";
-import { JTStore } from "./store.js";
+import { store } from "./store.js";
 import { debug, error, warn } from "./debugger.js";
-
-// 5375
-// 5577
-
+import { handlers } from "./handlers.js";
+import { globalHooks } from "./global-hooks.js";
 
 // show loading befor jt-fn?
-// global hooks
-
-const globalHooks = {
-    beforeRequest: [],
-    afterRequest: [],
-    requestError: [],
-};
 
 const JTML = {
-    // globalHooks: [],
     apply: (root = document.body) => {
         debug(root);
 
@@ -34,107 +23,31 @@ const JTML = {
     run: (el) => {
         handleEvent(el, "");
     },
-    store: JTStore,
-    registerGlobalHook: (fn) => {
-        if (!fn || typeof fn !== 'object') {
-            warn(`[jtml] cannot register ${fn}: must be object with optional properties { beforeRequest: () => {}, afterRequest: () => {}, requestError: () => {} }`);
-            return;
-        }
-
-        for (const key in globalHooks) {
-            if (fn[key] === undefined) {
-                continue;
-            }
-            if (typeof fn[key] !== 'function') {
-                warn(`[jtml] cannot register ${key} from ${JSON.stringify(fn)}: ${key} is not a function`);
-                continue;
-            }
-
-            globalHooks[key].push(fn[key]);
-        }
-    }
+    store,
+    handlers,
+    globalHooks,
 };
 
-// function bindNavigation(root) {
-//     const links = root.querySelectorAll("[jt-nav]");
-
-//     for (const link of links) {
-//         link.addEventListener("click", async (e) => {
-//             e.preventDefault();
-
-//             const url = link.getAttribute("href");
-//             if (!url) {
-//                 return;
-//             }
-
-//             await navigate(url);
-//         });
-//     }
-// }
-
-// async function navigate(url) {
-//     try {
-//         const res = await fetch(url, { method: "GET" });
-//         const html = await res.text();
-
-//         const parser = new DOMParser();
-//         const doc = parser.parseFromString(html, "text/html");
-
-//         const newBody = doc.body;
-//         if (!newBody) {
-//             return;
-//         }
-
-//         // Clear page-level store only
-//         JTStore.clearPrefix("page:");
-
-//         document.body.replaceWith(newBody);
-
-//         JTML.apply(document);
-//         window.history.pushState({}, "", url);
-
-//     } catch (err) {
-//         console.error("[jtml] navigation failed:", err);
-//     }
-// }
-
 const bindEvents = (el) => {
-    // const renderer = getRenderer(el);
 
-    const events = el.getAttribute("jt-actor").split(",").map(pair => pair.split(":"));
+    const events = el.getAttribute("jt-actor")
+        .split(",")
+        .map(pair => {
+            let [event, fnName = ""] = pair.split(":");
+            return [event.trim(), fnName.trim()];
+        });
 
     for (const [event, fnName] of events) {
 
-        const renderer = getRenderer(el); //@TODO async?
+        const renderer = getRenderer(el); // @TODO async?
 
         if (event === "load") {
             handleEvent(el, fnName, renderer);
             continue;
         }
 
-        // console.log(jtEvent.slice(3));
         el.addEventListener(event, (evt) => handleEvent(el, fnName, renderer, evt));
     }
-
-    // for (const jtEvent of SupportedEvents) {
-    //     const jtEventFnName = el.getAttribute(jtEvent);
-
-    //     // console.log(jtEvent);
-
-    //     if (jtEventFnName === null) {
-    //         continue;
-    //     }
-
-    //     const renderer = getRenderer(el); //@TODO async?
-
-    //     if (jtEvent === "jt-load") {
-    //         handleEvent(el, jtEventFnName, renderer);
-    //         continue;
-    //     }
-
-    //     // console.log(jtEvent.slice(3));
-    //     el.addEventListener(jtEvent.slice(3), (evt) => handleEvent(el, jtEventFnName, renderer, evt));
-    // }
 }
 
 const handleEvent = async (el, eventVal, renderer, evt) => {
@@ -142,21 +55,20 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
         evt.preventDefault();
     }
 
-    const res = await fnRunner(eventVal, el, evt);
+    const res = await handlers.access(eventVal, el, evt);
     if (res === false) {
         return;
     }
 
     if (["FORM", "A"].includes(el.tagName)) {
         const response = await httpRequest(el);
-        // const response = await httpRequest(el);
         if (!response) {
             return;
         }
 
         const storeKey = el.getAttribute("jt-store");
         if (storeKey) {
-            JTStore.add(storeKey, response);
+            store.set(storeKey, response);
         }
 
         actions(el, renderer, response);
@@ -165,7 +77,7 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
 
     let context = {};
 
-    const source = JTStore.get(el.getAttribute("jt-source"));
+    const source = store.get(el.getAttribute("jt-source"));
     if (source) {
         context = source;
     }
@@ -181,7 +93,7 @@ const actions = (el, renderer, context) => {
     const afters = resolveElsFromAttr(el, "jt-after") || [];
     for (const after of afters) {
         const afterRenderer = getRenderer(after);
-        handleEvent(after, "", afterRenderer); // notify proxy/chain/after?
+        handleEvent(after, "", afterRenderer); // @TODO notify proxy/chain/after?
     }
 }
 
@@ -194,12 +106,30 @@ const getRenderer = (requester) => {
     const target = resolveElFromAttr(requester, "jt-target") || requester;
     const swapper = getSwapper(requester);
 
-    return (data) => render(template, data, swapper, target);
+    return (data) => render(requester, template, data, swapper, target);
 }
 
 const getTemplater = (requester) => {
     if (requester.hasAttribute("jt-html")) {
-        return data => data;
+        return data => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data, 'text/html');
+
+            const scripts = [];
+            const domScripts = doc.body.querySelectorAll("script");
+
+            for (const domScript of domScripts) {
+                scripts.push(domScript.innerHTML);
+                domScript.remove();
+            }
+
+            const frag = document.createDocumentFragment();
+            for (const el of doc.body.children) {
+                frag.appendChild(el);
+            }
+
+            return { $frag: frag, $scripts: scripts };
+        };
     }
 
     const template = resolveElFromAttr(requester, "jt-render");
@@ -217,13 +147,24 @@ const getTemplater = (requester) => {
     return compiled;
 }
 
-const render = (renderer, data, swapper, target) => {
+const render = (requester, renderer, data, swapper, target) => {
+
     const dom = renderer(data);
     if (!dom) {
         return;
     }
 
-    swapper(target, dom);
+    if (dom instanceof DocumentFragment) {
+        swapper(target, dom);
+        JTML.apply(target);
+        return;
+    }
+
+    swapper(target, dom.$frag);
+
+    for (const script of dom.$scripts) {
+        (new Function(script))();
+    }
 
     JTML.apply(target);
 }
@@ -231,16 +172,15 @@ const render = (renderer, data, swapper, target) => {
 const getSwapper = (el) => {
     const swapType = el.getAttribute("jt-swap") || "replace";
     const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
+
     if (swapType && !isValidSwapType) {
         warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
     }
 
-    const isString = typeof dom === "string";
-
     return {
-        replace: (target, dom) => isString ? target.innerHTML = dom : target.replaceChildren(dom),
-        append: (target, dom) => isString ? target.innerHTML += dom : target.appendChild(dom),
-        prepend: (target, dom) => isString ? target.innerHTML = dom + target.innerHTML : target.prepend(dom),
+        replace: (target, dom) => target.replaceChildren(dom),
+        append: (target, dom) => target.appendChild(dom),
+        prepend: (target, dom) => target.prepend(dom),
     }[swapType];
 }
 
@@ -248,14 +188,14 @@ const httpRequest = async (requester) => {
     const { url, options } = getFetchOptions(requester);
 
     try {
-        runGlobalHooks("beforeRequest", requester, options);
-        await fnRunner(requester.getAttribute("jt-request\\:before"), requester, options);
+        globalHooks.run("beforeRequest", requester, options);
+        await handlers.access(requester.getAttribute("jt-request\\:before"), requester, options);
 
         const res = await fetch(url, options);
         const body = await getResponseBody(res);
 
-        runGlobalHooks("afterRequest", requester, res, body);
-        await fnRunner(requester.getAttribute("jt-request\\:after"), requester, res, body);
+        globalHooks.run("afterRequest", requester, res, body);
+        await handlers.access(requester.getAttribute("jt-request\\:after"), requester, res, body);
 
         if (!res.ok) {
             throw {
@@ -266,48 +206,12 @@ const httpRequest = async (requester) => {
 
         return body;
     } catch (err) {
-        runGlobalHooks("requestError", requester, err);
-        await fnRunner(requester.getAttribute("jt-request\\:error"), requester, err);
+        globalHooks.run("requestError", requester, err);
+        await handlers.access(requester.getAttribute("jt-request\\:error"), requester, err);
 
         error("[jtml] fetch failed:", url, err);
     }
 }
-
-const fnRunner = async (name, ...args) => {
-    const fn = window[name];
-    if (name && !fn) {
-        warn(`[jtml] cannot find function ${name}`);
-    }
-
-    return (fn && fn(...args));
-}
-
-// const jtRequester = async (requester) => {
-//     // deprecate?
-//     const loadingEl = resolveElFromAttr(requester, "jt-loading");
-//     const errorEl = resolveElFromAttr(requester, "jt-error");
-
-//     showElement(loadingEl);
-//     hideElement(errorEl);
-
-//     try {
-//         const data = await httpRequest(requester);
-
-//         hideElement(loadingEl);
-//         hideElement(errorEl);
-
-//         return data;
-
-//     } catch (err) {
-//         hideElement(loadingEl);
-//         showElement(errorEl);
-
-//         // double logged?
-
-//         // console.error("[jtml] Form request failed:", err, "on actor", requester);
-//         error("[jtml] Form request failed:", err, "on actor", requester);
-//     }
-// }
 
 const getFetchOptions = (requester) => {
     let url = requester.getAttribute("action") || requester.getAttribute("href");
@@ -384,33 +288,10 @@ const resolveElsFromAttr = (el, attr) => {
     try {
         return document.querySelectorAll(selector);
     } catch {
-        // console.warn(`[jtml] Invalid ${attr} selector "${selector}"`);
         warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return null;
     }
 }
-
-const runGlobalHooks = (phase, ...params) => {
-    for (const hook of globalHooks[phase]) {
-        hook(...params);
-    }
-};
-
-// const showElement = (el) => {
-//     if (!el) {
-//         return;
-//     }
-
-//     el.style.display = "";
-// };
-
-// const hideElement = (el) => {
-//     if (!el) {
-//         return;
-//     }
-
-//     el.style.display = "none";
-// };
 
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => JTML.apply());
@@ -419,6 +300,3 @@ if (document.readyState === "loading") {
 }
 
 export default JTML;
-
-// 338
-// 670 peak
