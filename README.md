@@ -216,7 +216,7 @@ function user() {
 const dispose = JTML.store.add(user);
 
 // Set / get with dotted paths
-JTML.store.set("user.name", "Dent");
+JTML.store.set("user.name", "Two Hundred");
 JTML.store.set("user.posts", [{ title: "42" }]);
 
 const name = JTML.store.get("user.name");
