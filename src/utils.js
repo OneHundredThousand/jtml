@@ -46,4 +46,6 @@ export const isFunction = (str) => typeof str === "function";
 
 export const isObject = (str) => typeof str === "object";
 
+export const isHTMLTemplateElement = (dom) => dom instanceof HTMLTemplateElement;
+
 export const isDocumentFragment = (dom) => dom instanceof DocumentFragment;
