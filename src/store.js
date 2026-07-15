@@ -1,18 +1,18 @@
-import { getNestedValue, setNestedValue } from "./utils";
-import { warn } from "./debugger";
+import { getNestedValue, setNestedValue, isFunction, isObject } from "./utils";
+import { warn } from "./debugger/utils";
 
 const data = {};
 
 // validate this
 export const store = {
     add: (fn) => {
-        if (typeof fn !== "function") {
+        if (!isFunction(fn)) {
             warn(`store: add() expects a function, "${typeof fn}" received.`);
             return;
         }
 
         const value = fn();
-        if (typeof value !== "object") {
+        if (!isObject(value)) {
             warn(`store: add() value must be an object, "${typeof value}" received.`);
             return;
         }
@@ -43,3 +43,10 @@ export const store = {
     //     delete this.data[key];
     // },
 };
+
+export const getStore = (path) => {
+    return {
+        path,
+        store: getNestedValue(data, path),
+    };
+}
