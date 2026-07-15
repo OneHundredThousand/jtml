@@ -1,5 +1,5 @@
-import { getNestedValue } from "./utils";
-import { error, warn } from "./debugger";
+import { getNestedValue, isDocumentFragment } from "./utils";
+import { error, warn } from "./debugger/utils";
 
 const AST_TYPE = {
     Element: 1,
@@ -19,8 +19,11 @@ const INTERPOLATION_NODE_TYPE = {
     Expr: 2,
 };
 
+const TEXT_NODE = Node.TEXT_NODE;
+const ELEMENT_NODE = Node.ELEMENT_NODE;
+
 export const compileTemplate = (template) => {
-    const isTemplate = template instanceof HTMLTemplateElement;
+    const isTemplate = isDocumentFragment(template);
 
     const roots = isTemplate ? template.content.childNodes : [template];
     const renderers = createRenderers(roots);
@@ -39,13 +42,14 @@ const createRenderers = (elems) => {
     const nodes = [];
     for (let i = 0; i < elems.length; i++) {
         const el = elems[i];
+        const nodeType = elems[i].nodeType;
 
-        if (el.nodeType === Node.TEXT_NODE) {
+        if (nodeType === TEXT_NODE) {
             nodes.push(toText(el));
             continue;
         }
 
-        if (el.nodeType !== Node.ELEMENT_NODE) {
+        if (nodeType !== ELEMENT_NODE) {
             continue;
         }
 
@@ -80,7 +84,7 @@ const readConditionalChain = (children, start) => {
     while (i < children.length) {
         const el = children[i];
 
-        if (el.nodeType !== Node.ELEMENT_NODE) {
+        if (el.nodeType !== ELEMENT_NODE) {
             i++;
             continue;
         }
@@ -136,17 +140,14 @@ const toIf = (chain) => {
 
 const toBranch = (node, type) => {
     let condition;
-    switch (type) {
-        case IF_TYPE.If:
-            condition = compileIf(node, "jt-if");
-            break;
-        case IF_TYPE.ElseIf:
-            condition = compileIf(node, "jt-elseif");
-            break;
-        case IF_TYPE.Else:
-            condition = () => true;
-            break;
+    if (type === IF_TYPE.If) {
+        condition = compileIf(node, "jt-if");
+    } else if (type === IF_TYPE.ElseIf) {
+        condition = compileIf(node, "jt-elseif");
+    } else {
+        condition = () => true;
     }
+
     return {
         $type: type,
         $condition: condition,
@@ -173,15 +174,15 @@ const toForeach = (node) => {
 const compileBinders = (node) => {
     const binders = [];
 
-    for (let attr of node.attributes) {
+    for (const attr of node.attributes) {
         if (attr.name.startsWith("jt-attr:")) {
-            const [, realAttr] = attr.name.split(":");
-
             if (!attr.value) {
                 continue;
             }
 
             const text = compileInterpolations(attr.value);
+            const realAttr = attr.name.slice(8);
+
             binders.push((el, ctx) => {
                 el.setAttribute(realAttr, text(ctx));
             });
@@ -189,7 +190,7 @@ const compileBinders = (node) => {
     }
 
     return binders;
-}
+};
 
 const compileIf = (node, attr) => {
     const xif = node.getAttribute(attr);
@@ -227,17 +228,24 @@ const compileIf = (node, attr) => {
     const getExpression = (val) => {
         if (/^'.*'$/.test(val)) {
             return () => val.slice(1, -1);
-        } else if (val === "true") {
-            return () => true
-        } else if (val === "false") {
-            return () => false;
-        } else if (val === "null") {
-            return () => null;
-        } else if (val === "undefined") {
-            return () => undefined;
-        } else if (!isNaN(Number(val))) {
+        }
+
+        if (!isNaN(Number(val))) {
             return () => Number(val);
         }
+
+        const literals = {
+            "true": true,
+            "false": false,
+            "undefined": undefined,
+            "null": null,
+        };
+
+        const literalFn = literals[val];
+        if (literals.hasOwnProperty(val)) {
+            return () => literalFn[val];
+        }
+
         return (ctx) => getNestedValue(ctx, val);
     };
 
@@ -249,7 +257,7 @@ const compileIf = (node, attr) => {
         const rightValue = rightAccessor(ctx);
         return opFn(leftValue, rightValue);
     };
-}
+};
 
 const compileInterpolations = (str) => {
     const parts = [];
@@ -282,7 +290,7 @@ const compileInterpolations = (str) => {
             const close = str.indexOf("}", exprStart);
 
             if (close === -1) {
-                error(`Unmatched "{" at position ${i} in template: ${JSON.stringify(str)}`)
+                error(`Unmatched "{" at position ${i} in template: "${str}"`);
                 return;
             }
 
@@ -292,7 +300,7 @@ const compileInterpolations = (str) => {
                 return;
             }
 
-            parts.push({ type: INTERPOLATION_NODE_TYPE.Expr, $expr: expr });
+            parts.push({ $type: INTERPOLATION_NODE_TYPE.Expr, $expr: expr });
             i = close + 1;
             staticStart = i;
             continue;

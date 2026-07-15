@@ -1,6 +1,6 @@
 export const getNestedValue = (obj, paths) => {
-    if (typeof paths !== "string" || paths === "") {
-        return obj;
+    if (!isString(paths)) {
+        return;
     }
 
     if (paths === ".") {
@@ -10,7 +10,7 @@ export const getNestedValue = (obj, paths) => {
     let current = obj;
     for (const path of paths.split(".")) {
         if (!current) {
-            return undefined;
+            return;
         }
 
         current = current[path];
@@ -20,8 +20,8 @@ export const getNestedValue = (obj, paths) => {
 };
 
 export const setNestedValue = (obj, path, value) => {
-    if (typeof paths !== "string" || paths === "") {
-        return obj;
+    if (!isString(path)) {
+        return;
     }
 
     const keys = path.split(".");
@@ -38,3 +38,12 @@ export const setNestedValue = (obj, path, value) => {
     current[keys[keys.length - 1]] = value;
     return obj;
 };
+
+
+export const isString = (str) => typeof str === "string" && str !== "";
+
+export const isFunction = (str) => typeof str === "function";
+
+export const isObject = (str) => typeof str === "object";
+
+export const isDocumentFragment = (dom) => dom instanceof DocumentFragment;
