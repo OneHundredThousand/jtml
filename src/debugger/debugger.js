@@ -1,3 +1,7 @@
+import { getHandler } from "../handlers";
+import { getStore } from "../store";
+import { warn } from "./utils";
+
 const __DEV__ = process.env.NODE_ENV !== "production";
 
 const script = document.currentScript;
@@ -14,18 +18,33 @@ export function debug(root) {
         const actors = root.querySelectorAll("[jt-actor]");
 
         const jtProps = {
-            "jt-source": (actor) => actor.getAttribute("jt-source"),
             "jt-store": (actor) => actor.hasAttribute("jt-store"),
             "jt-html": (actor) => actor.hasAttribute("jt-html"),
             "jt-render": (actor) => resolveElFromAttr(actor, "jt-render"),
             "jt-target": (actor) => resolveElFromAttr(actor, "jt-target") || actor,
             "jt-swap": (actor) => actor.getAttribute("jt-swap") || "replace",
-            "jt-after": (actor) => resolveElsFromAttr(actor, "jt-after"),
+            "jt-after": (actor) => resolveElFromAttr(actor, "jt-after", true),
 
-            // @TODO fix access
-            "jt-request:before": (actor) => window[actor.getAttribute("jt-request:before")],
-            "jt-request:after": (actor) => window[actor.getAttribute("jt-request:after")],
-            "jt-request:error": (actor) => window[actor.getAttribute("jt-request:error")]
+            "jt-source": (actor) => ({
+                name: actor.getAttribute("jt-source"),
+                store: getStore(actor.getAttribute("jt-source")),
+            }),
+
+            "jt-request:before": (actor) => ({
+                name: actor.getAttribute("jt-request:before"),
+                class: getHandler(actor.getAttribute("jt-request:before"))?.constructor,
+                handler: getHandler(actor.getAttribute("jt-request:before"))?.handler,
+            }),
+            "jt-request:after": (actor) => ({
+                name: actor.getAttribute("jt-request:after"),
+                class: getHandler(actor.getAttribute("jt-request:after"))?.constructor,
+                handler: getHandler(actor.getAttribute("jt-request:after"))?.handler,
+            }),
+            "jt-request:error": (actor) => ({
+                name: actor.getAttribute("jt-request:error"),
+                class: getHandler(actor.getAttribute("jt-request:error"))?.constructor,
+                handler: getHandler(actor.getAttribute("jt-request:error"))?.handler,
+            }),
         };
 
         for (const actor of actors) {
@@ -37,7 +56,7 @@ export function debug(root) {
             }
 
             const props = {
-                actor: {
+                "jt-actor": {
                     event: actor.getAttribute("jt-actor"),
                     element: actor,
                 },
@@ -56,50 +75,19 @@ export function debug(root) {
     }
 }
 
-// @RODO add stacktace
-export function error(...data) {
-    if (!__DEV__) {
+const resolveElFromAttr = (el, attr, all = false) => {
+    const selector = el.getAttribute(attr);
+    if (!selector) {
         return;
     }
 
-    console.error(...data);
-}
-
-export function warn(...data) {
-    if (!__DEV__) {
+    try {
+        return all ? document.querySelectorAll(selector) : document.querySelector(selector);
+    } catch {
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
         return;
     }
-
-    console.warn(...data);
-}
-
-const resolveElFromAttr = (el, attr) => {
-    const selector = el.getAttribute(attr);
-    if (!selector) {
-        return null;
-    }
-
-    try {
-        return document.querySelector(selector);
-    } catch {
-        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
-        return null;
-    }
-}
-
-const resolveElsFromAttr = (el, attr) => {
-    const selector = el.getAttribute(attr);
-    if (!selector) {
-        return null;
-    }
-
-    try {
-        return document.querySelectorAll(selector);
-    } catch {
-        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
-        return null;
-    }
-}
+};
 
 /*
     // --- Entry point: pass the <template>, the bad node, and why ---
