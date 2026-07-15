@@ -7,7 +7,6 @@ import { debug } from "./debugger/debugger";
 import { error, warn } from "./debugger/utils";
 
 const bindEvents = (el) => {
-    // return;
     for (const pair of el.getAttribute("jt-actor").split(",")) {
 
         const separator = (pair + ":").indexOf(":");
@@ -66,6 +65,7 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
 }
 
 const actions = (el, renderer, context) => {
+
     if (renderer) {
         renderer(context);
     }
@@ -170,13 +170,22 @@ const httpRequest = async (requester) => {
 
     try {
         runBeforeRequests(requester, $options);
-        await handlers.access(requester.getAttribute("jt-request:before"), requester, $options);
+
+        const beforeHook = requester.getAttribute("jt-request:before");
+        if (beforeHook) {
+            await handlers.access(beforeHook, requester, $options);
+        }
+
 
         const res = await fetch($url, $options);
         const body = await getResponseBody(res);
 
         runAfterRequests(requester, res, body);
-        await handlers.access(requester.getAttribute("jt-request:after"), requester, res, body);
+
+        const afterHook = requester.getAttribute("jt-request:after");
+        if (afterHook) {
+            await handlers.access(afterHook, requester, res, body);
+        }
 
         if (!res.ok) {
             throw {
@@ -188,7 +197,11 @@ const httpRequest = async (requester) => {
         return body;
     } catch (err) {
         runRequestErrors(requester, err);
-        await handlers.access(requester.getAttribute("jt-request:error"), requester, err);
+
+        const onError = requester.getAttribute("jt-request:error");
+        if (onError) {
+            await handlers.access(onError, requester, err);
+        }
 
         error("[jtml] fetch failed:", $url, err);
     }
@@ -263,7 +276,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
 export const apply = (root = document) => {
     debug(root);
 
-    const start = performance.now();
+    // const start = performance.now();
 
     // const xpath = "//*[@*[starts-with(name(), 'jt-on:')]]";
     // const result = document.evaluate(
@@ -295,8 +308,8 @@ export const apply = (root = document) => {
         actor._redered = true;
     }
 
-    const end = performance.now();
-    console.log(`${end - start} ms`);
+    // const end = performance.now();
+    // console.log(`${end - start} ms`);
 };
 
 export const run = (el) => handleEvent(el, "");

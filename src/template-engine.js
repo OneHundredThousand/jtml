@@ -1,4 +1,4 @@
-import { getNestedValue, isDocumentFragment } from "./utils";
+import { getNestedValue, isHTMLTemplateElement } from "./utils";
 import { error, warn } from "./debugger/utils";
 
 const AST_TYPE = {
@@ -23,7 +23,7 @@ const TEXT_NODE = Node.TEXT_NODE;
 const ELEMENT_NODE = Node.ELEMENT_NODE;
 
 export const compileTemplate = (template) => {
-    const isTemplate = isDocumentFragment(template);
+    const isTemplate = isHTMLTemplateElement(template);
 
     const roots = isTemplate ? template.content.childNodes : [template];
     const renderers = createRenderers(roots);

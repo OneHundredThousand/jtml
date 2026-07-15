@@ -23,7 +23,7 @@ export const handlers = {
     },
     access: async (path, ...params) => {
         if (!isString(path)) {
-            warn(`handlers: access() path must be a string ${typeof path} received.`);
+            warn(`handlers: access() path "${path}" must be a string, ${typeof path} received.`);
             return;
         }
 

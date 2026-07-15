@@ -7,13 +7,13 @@ const data = {};
 export const store = {
     add: (fn) => {
         if (!isFunction(fn)) {
-            warn(`store: add() expects a function, "${typeof fn}" received.`);
+            warn(`store: add() "${fn}" must be a function, "${typeof fn}" received.`);
             return;
         }
 
         const value = fn();
         if (!isObject(value)) {
-            warn(`store: add() value must be an object, "${typeof value}" received.`);
+            warn(`store: add() "value" must be an object, "${typeof value}" received.`);
             return;
         }
 
