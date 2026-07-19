@@ -15,59 +15,59 @@ export function debug(root) {
     const params = url.searchParams;
 
     if (params.has("debug")) {
-        const actors = root.querySelectorAll("[jt-actor]");
+        const events = root.querySelectorAll("[jt-event]");
 
         const jtProps = {
-            "jt-store": (actor) => actor.hasAttribute("jt-store"),
-            "jt-html": (actor) => actor.hasAttribute("jt-html"),
-            "jt-render": (actor) => resolveElFromAttr(actor, "jt-render"),
-            "jt-target": (actor) => resolveElFromAttr(actor, "jt-target") || actor,
-            "jt-swap": (actor) => actor.getAttribute("jt-swap") || "replace",
-            "jt-after": (actor) => resolveElFromAttr(actor, "jt-after", true),
+            "jt-store": (event) => event.hasAttribute("jt-store"),
+            "jt-html": (event) => event.hasAttribute("jt-html"),
+            "jt-render": (event) => resolveElFromAttr(event, "jt-render"),
+            "jt-target": (event) => resolveElFromAttr(event, "jt-target") || event,
+            "jt-swap": (event) => event.getAttribute("jt-swap") || "replace",
+            "jt-after": (event) => resolveElFromAttr(event, "jt-after", true),
 
-            "jt-source": (actor) => ({
-                name: actor.getAttribute("jt-source"),
-                store: getStore(actor.getAttribute("jt-source")),
+            "jt-source": (event) => ({
+                name: event.getAttribute("jt-source"),
+                store: getStore(event.getAttribute("jt-source")),
             }),
 
-            "jt-request:before": (actor) => ({
-                name: actor.getAttribute("jt-request:before"),
-                class: getHandler(actor.getAttribute("jt-request:before"))?.constructor,
-                handler: getHandler(actor.getAttribute("jt-request:before"))?.handler,
+            "jt-request:before": (event) => ({
+                name: event.getAttribute("jt-request:before"),
+                class: getHandler(event.getAttribute("jt-request:before"))?.constructor,
+                handler: getHandler(event.getAttribute("jt-request:before"))?.handler,
             }),
-            "jt-request:after": (actor) => ({
-                name: actor.getAttribute("jt-request:after"),
-                class: getHandler(actor.getAttribute("jt-request:after"))?.constructor,
-                handler: getHandler(actor.getAttribute("jt-request:after"))?.handler,
+            "jt-request:after": (event) => ({
+                name: event.getAttribute("jt-request:after"),
+                class: getHandler(event.getAttribute("jt-request:after"))?.constructor,
+                handler: getHandler(event.getAttribute("jt-request:after"))?.handler,
             }),
-            "jt-request:error": (actor) => ({
-                name: actor.getAttribute("jt-request:error"),
-                class: getHandler(actor.getAttribute("jt-request:error"))?.constructor,
-                handler: getHandler(actor.getAttribute("jt-request:error"))?.handler,
+            "jt-request:error": (event) => ({
+                name: event.getAttribute("jt-request:error"),
+                class: getHandler(event.getAttribute("jt-request:error"))?.constructor,
+                handler: getHandler(event.getAttribute("jt-request:error"))?.handler,
             }),
         };
 
-        for (const actor of actors) {
+        for (const event of events) {
 
             if (params.has("debug-only")) {
-                if (!actor.hasAttribute("jt-debug-only")) {
+                if (!event.hasAttribute("jt-debug-only")) {
                     continue;
                 }
             }
 
             const props = {
-                "jt-actor": {
-                    event: actor.getAttribute("jt-actor"),
-                    element: actor,
+                "jt-event": {
+                    name: event.getAttribute("jt-event"),
+                    element: event,
                 },
             };
 
             for (const jtProp in jtProps) {
-                if (!actor.hasAttribute(jtProp) && !params.has("debug-verbose")) {
+                if (!event.hasAttribute(jtProp) && !params.has("debug-verbose")) {
                     continue;
                 }
 
-                props[jtProp] = jtProps[jtProp](actor);
+                props[jtProp] = jtProps[jtProp](event);
             }
 
             console.log("Processing JTML el:", props);
@@ -84,7 +84,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
     try {
         return all ? document.querySelectorAll(selector) : document.querySelector(selector);
     } catch {
-        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on event`, el);
         return;
     }
 };
