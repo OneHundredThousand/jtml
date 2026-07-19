@@ -33,12 +33,12 @@
     <form id="playground-form">
         <textarea id="code" name="code" rows="10" cols="80">
 <!-- Type your jtml here -->
-<form action="https://dummyjson.com/users" jt-load jt-render="template" jt-target="#out"></form>
+<form action="https://dummyjson.com/users" jt-event="load" jt-render="template" jt-target="#out"></form>
 <template>
-    <div jt-foreach="users">
-        <img jt-attr:src="image">
-        <span jt-text="firstName"></span>
-        <span jt-text="age"></span>
+    <div jt-foreach="users as user">
+        <img jt-attr:src="user.image">
+        <span jt-text="user.firstName"></span>
+        <span jt-text="user.age"></span>
     </div>
 </template>
 <div id="out"></div>
@@ -55,7 +55,7 @@
 
     <p style="font-size: 0.8rem; color: #888;">Try it!</p>
 
-    <script src="jtml-min.js"></script>
+    <script src="jtml-min-v0.4.6.js"></script>
     <script>
         const textarea = document.getElementById("code");
         const playgroundOutput = document.getElementById("playground-output");
