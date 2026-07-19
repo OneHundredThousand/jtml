@@ -161,7 +161,8 @@ const toForeach = (node) => {
         return foreach;
     }
 
-    const [collection, alias] = foreach.trim().split(" ").filter(Boolean);
+    // @TODO: add validation
+    const [collection, , alias] = foreach.trim().split(" ").filter(Boolean);
     return {
         $type: AST_TYPE.Loop,
         $collection: collection,
