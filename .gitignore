@@ -2,5 +2,4 @@
 /dist/
 /dev/*.js
 /dev/*.map
-/docs/*.js
 /docs/*.map
