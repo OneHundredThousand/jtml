@@ -166,7 +166,7 @@ const getSwapper = (el) => {
     const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
 
     if (swapType && !isValidSwapType) {
-        warn(`[jtml] unknown [jt-swap] value ${swapType} on actor`, el);
+        warn(`[jtml] unknown [jt-swap] value ${swapType} on event`, el);
     }
 
     const swappers = {
@@ -280,7 +280,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
     try {
         return all ? document.querySelectorAll(selector) : document.querySelector(selector);
     } catch {
-        warn(`[jtml] Invalid ${attr} selector "${selector}" on actor`, el);
+        warn(`[jtml] Invalid ${attr} selector "${selector}" on event`, el);
         return;
     }
 };
@@ -288,7 +288,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
 export const apply = (root = document) => {
     debug(root);
 
-    const start = performance.now();
+    // const start = performance.now();
 
     // const xpath = "//*[@*[starts-with(name(), 'jt-on:')]]";
     // const result = document.evaluate(
@@ -309,19 +309,19 @@ export const apply = (root = document) => {
     //     actor._redered = true;
     // }
 
-    const actors = root.querySelectorAll("[jt-actor]");
+    const events = root.querySelectorAll("[jt-event]");
 
-    for (const actor of actors) {
-        if (actor._redered) {
+    for (const event of events) {
+        if (event._redered) {
             continue;
         }
 
-        bindEvents(actor);
-        actor._redered = true;
+        bindEvents(event);
+        event._redered = true;
     }
 
-    const end = performance.now();
-    console.log(`${end - start} ms`);
+    // const end = performance.now();
+    // console.log(`${end - start} ms`);
 };
 
 export const run = (el) => handleEvent(el, "");
