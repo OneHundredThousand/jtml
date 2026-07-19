@@ -161,7 +161,7 @@ const toForeach = (node) => {
         return foreach;
     }
 
-    const [collection, alias] = foreach.trim().split(/\s+as\s+/);
+    const [collection, alias] = foreach.trim().split(" ").filter(Boolean);
     return {
         $type: AST_TYPE.Loop,
         $collection: collection,
@@ -207,7 +207,7 @@ const compileIf = (node, attr) => {
         lte: (a, b) => a <= b,
     };
 
-    const parts = xif.trim().split(/\s+/);
+    const parts = xif.trim().split(" ").filter(Boolean);
     if (parts.length === 1) {
         let [path] = parts;
         if (path[0] === "!") {

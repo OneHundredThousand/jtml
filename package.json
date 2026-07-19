@@ -1,6 +1,6 @@
 {
     "name": "jtml",
-    "version": "1.0.0",
+    "version": "0.4.6",
     "description": "**jtml** is a lightweight JavaScript micro-library inspired by [HTMX](https://htmx.org), but built for the JSON age. It brings HTML templating back to the front of frontend development—where it belongs.",
     "main": "template.js",
     "directories": {
@@ -9,6 +9,7 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "watch": "OUTPUT_PATH=dev npx rollup -c rollup.config.mjs --watch",
+        "build-dev": "NODE_ENV=development npx rollup -c rollup.config.mjs",
         "build": "NODE_ENV=production npx rollup -c rollup.config.mjs",
         "dev": "concurrently 'npm run watch' 'npx serve ./dev'"
     },
@@ -16,15 +17,14 @@
     "author": "",
     "license": "ISC",
     "devDependencies": {
-        "@rollup/plugin-commonjs": "^29.0.0",
+        "@rollup/plugin-commonjs": "^29.0.3",
         "@rollup/plugin-node-resolve": "^16.0.3",
         "@rollup/plugin-replace": "^6.0.3",
         "@rollup/plugin-terser": "^0.4.4",
-        "rollup": "^4.54.0"
+        "rollup": "^4.62.2"
     },
     "dependencies": {
-        "concurrently": "^9.2.1",
-        "serve": "^14.2.5",
-        "terser": "^5.44.1"
+        "concurrently": "^9.2.4",
+        "serve": "^14.2.6"
     }
 }

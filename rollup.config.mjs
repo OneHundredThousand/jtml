@@ -1,3 +1,5 @@
+
+import pkg from "./package.json" assert { type: "json" };
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import terser from "@rollup/plugin-terser";
@@ -6,10 +8,12 @@ import replace from '@rollup/plugin-replace';
 const isProd = process.env.NODE_ENV === "production";
 const outputPath = process.env.OUTPUT_PATH || 'docs';
 
+const name = `${outputPath}/jtml-min${!isProd ? "-dev" : ""}${"-v" + pkg.version}.js`;
+
 export default {
   input: "src/main.js",
   output: {
-    file: `${outputPath}/jtml-min.js`,
+    file: name,
     format: "iife", // or "iife" for browser
     sourcemap: !isProd,
     name: "JTML",

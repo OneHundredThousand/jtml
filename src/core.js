@@ -6,24 +6,36 @@ import { isDocumentFragment } from "./utils";
 import { debug } from "./debugger/debugger";
 import { error, warn } from "./debugger/utils";
 
-const bindEvents = (el) => {
-    for (const pair of el.getAttribute("jt-actor").split(",")) {
+// add JSdoc
+// build versioning
 
-        const separator = (pair + ":").indexOf(":");
-        const event = pair.slice(0, separator).trim();
-        const fnName = pair.slice(separator + 1).trim();
+const bindEvents = (el) => {
+    const handlerName = el.getAttribute("jt-handler");
+
+    for (const event of el.getAttribute("jt-event").split(" ")) {
+
+        if (!event) {
+            continue;
+        }
+
+        // const separator = (pair + ":").indexOf(":");
+        // const event = pair.slice(0, separator).trim();
+        // const fnName = pair.slice(separator + 1).trim();
 
         const renderer = getRenderer(el); // @TODO async?
 
         if (event === "load") {
-            handleEvent(el, fnName, renderer);
+            // handleEvent(el, fnName, renderer);
+            handleEvent(el, handlerName, renderer);
             continue;
         }
 
-        el.addEventListener(event, (evt) => handleEvent(el, fnName, renderer, evt));
+        el.addEventListener(event, (evt) => handleEvent(el, handlerName, renderer, evt));
     }
 }
 
+// check if this can be sync and only async if needed
+// should there be a jt-trigger or jt-before, opposite of jt-after
 const handleEvent = async (el, eventVal, renderer, evt) => {
     if (evt) {
         evt.preventDefault();
@@ -276,7 +288,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
 export const apply = (root = document) => {
     debug(root);
 
-    // const start = performance.now();
+    const start = performance.now();
 
     // const xpath = "//*[@*[starts-with(name(), 'jt-on:')]]";
     // const result = document.evaluate(
@@ -308,8 +320,8 @@ export const apply = (root = document) => {
         actor._redered = true;
     }
 
-    // const end = performance.now();
-    // console.log(`${end - start} ms`);
+    const end = performance.now();
+    console.log(`${end - start} ms`);
 };
 
 export const run = (el) => handleEvent(el, "");
