@@ -28,7 +28,7 @@ JTML enhances real HTML — it doesn’t replace it.
 <form
   action="/posts"
   method="GET"
-  jt-actor="load"
+  jt-event="load"
   jt-render="#posts-template"
   jt-target="#output"
 >
@@ -62,29 +62,34 @@ JTML fetches, then renders the template into `#output`.
 
 ---
 
-## ⚡ Actors (`jt-actor`)
+## ⚡ Events (`jt-event`)
 
 Behavior is bound with a single attribute:
 
 ```html
-jt-actor="event:Handler.method, anotherEvent"
+jt-event="event anotherEvent"
 ```
 
-- `event` — any native DOM event name, or the special `load` (runs once when the actor is bound)
-- `Handler.method` — optional. Path to a registered handler method. If omitted the default action runs (fetch for forms/anchors, or render from store).
+- `event` — any native DOM event name, or the special `load` (runs once when the event is bound)
+
+```html
+jt-handler="Handler.method"
+```
+
+- `Handler.method` — Path to a registered handler method. If omitted the default action runs (fetch for forms/anchors, or render from store).
 
 Examples:
 
 ```html
-<button jt-actor="click:App.onClick" jt-render="#tpl" jt-target="#out">
+<button jt-event="click" jt-handler="App.onClick" jt-render="#tpl" jt-target="#out">
   Go
 </button>
 
-<form jt-actor="submit" action="/save" method="POST" jt-render="#result">
+<form jt-event="submit" action="/save" method="POST" jt-render="#result">
   ...
 </form>
 
-<div jt-actor="load" jt-source="user" jt-render="#profile"></div>
+<div jt-event="load" jt-source="user" jt-render="#profile"></div>
 ```
 
 ```js
@@ -97,15 +102,15 @@ class App {
 JTML.handlers.add(App);
 ```
 
-Multiple events: `jt-actor="click:App.a, input:App.b"`
+Multiple events: `jt-event="click input"`
 
-`JTML.run(el)` manually triggers an actor (with empty handler path).
+`JTML.run(el)` manually triggers an event (with empty handler path).
 
 ---
 
 ## Forms & Anchors (HTTP)
 
-When the actor element is a `<form>` or `<a>`, JTML performs a `fetch` on the bound event.
+When the event element is a `<form>` or `<a>`, JTML performs a `fetch` on the bound event.
 
 - URL from `action` or `href`
 - Method from `method` (defaults to `GET`)
@@ -134,12 +139,12 @@ jt-request:error="App.onError"
 |---------------|--------------------------------------------------|-------------|
 | `jt-render`   | CSS selector of a `<template>`                   | —           |
 | `jt-html`     | Treat response as raw HTML (parse + run scripts) | —           |
-| `jt-target`   | Where to put the result                          | the actor itself |
+| `jt-target`   | Where to put the result                          | the event itself |
 | `jt-swap`     | `replace` / `append` / `prepend`                 | `replace`   |
-| `jt-after`    | CSS selector(s) of other actors to run next      | —           |
+| `jt-after`    | CSS selector(s) of other event to run next      | —           |
 | `jt-source`   | Store path used as render context (non-HTTP)     | —           |
 
-After a render, JTML automatically re-applies itself to the new content so nested actors work.
+After a render, JTML automatically re-applies itself to the new content so nested events work.
 
 `jt-html` is useful when the server returns a full HTML fragment (scripts inside are extracted and executed after insertion).
 
@@ -231,7 +236,7 @@ In HTML:
 
 <!-- later, re-render from store -->
 <div
-  jt-actor="load"
+  jt-event="load"
   jt-source="posts"
   jt-render="#list-template"
   jt-target="#list">
@@ -270,7 +275,7 @@ JTML.handlers.add(App);
 Reference them from attributes:
 
 ```html
-jt-actor="click:App.onClick"
+jt-event="click"
 jt-request:before="App.before"
 jt-request:after="App.after"
 jt-request:error="App.onError"
@@ -290,7 +295,7 @@ JTML.globalHooks.register({
 });
 ```
 
-They run for every HTTP request, in addition to any per-actor `jt-request:*` handlers.
+They run for every HTTP request, in addition to any per-event `jt-request:*` handlers.
 
 ---
 
@@ -302,8 +307,8 @@ They run for every HTTP request, in addition to any per-actor `jt-request:*` han
 
 Flags (query params on the script URL):
 
-- `?debug` — log every actor that is processed
-- `?debug&debug-only` — only actors that also have `jt-debug-only`
+- `?debug` — log every event that is processed
+- `?debug&debug-only` — only event that also have `jt-debug-only`
 - `?debug&debug-verbose` — include props even when the attribute is absent
 
 ---
@@ -313,10 +318,10 @@ Flags (query params on the script URL):
 ```js
 JTML.apply();                 // whole document
 JTML.apply(someElement);      // subtree only
-JTML.run(document.querySelector("#foo")); // run an actor
+JTML.run(document.querySelector("#foo")); // run an event
 ```
 
-Actors already processed are skipped (`_rendered` flag).
+Events already processed are skipped (`_rendered` flag).
 
 ---
 
