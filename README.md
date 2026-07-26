@@ -192,7 +192,7 @@ The loop element itself supports `jt-text` and `jt-attr:*`.
 </div>
 ```
 
-Operators: `eq` `neq` `gt` `lt` `gte` `lte`
+Operators: `eq` `ne` `gt` `lt` `gte` `lte`
 
 Also supports bare truthy check or `!path`:
 
