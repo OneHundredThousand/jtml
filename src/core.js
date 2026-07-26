@@ -10,7 +10,7 @@ const appliedCache = new WeakMap();
 
 const parseEventEl = (el) => {
     const eventMeta = {
-        $events: el.getAttribute("jt-event").split(" ").filter(Boolean),
+        $events: el.getAttribute("jt-event")?.split(" ")?.filter(Boolean),
         $renderer: getRenderer(el),
         $isHtml: el.hasAttribute("jt-html"),
         $handler: getHandler(el),
