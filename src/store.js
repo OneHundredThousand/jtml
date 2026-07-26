@@ -43,10 +43,3 @@ export const store = {
     //     delete this.data[key];
     // },
 };
-
-export const getStore = (path) => {
-    return {
-        path,
-        store: getNestedValue(data, path),
-    };
-}

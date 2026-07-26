@@ -1,53 +1,98 @@
 import { compileTemplate } from "./template-engine";
 import { handlers } from "./handlers";
 import { store } from "./store";
-import { globalHooks, runBeforeRequests, runAfterRequests, runRequestErrors } from "./global-hooks";
+import { run as hooksRunner, BEFORE_REQUEST, AFTER_REQUEST, REQUEST_ERROR } from "./global-hooks";
 import { isDocumentFragment } from "./utils";
 import { debug } from "./debugger/debugger";
 import { error, warn } from "./debugger/utils";
 
-// add JSdoc
-// build versioning
+const appliedCache = new WeakMap();
 
-const bindEvents = (el) => {
-    const handlerName = el.getAttribute("jt-handler");
+const parseEventEl = (el) => {
+    const eventMeta = {
+        $events: el.getAttribute("jt-event").split(" ").filter(Boolean),
+        $renderer: getRenderer(el),
+        $isHtml: el.hasAttribute("jt-html"),
+        $handler: getHandler(el),
+        $swapper: getSwapper(el),
+        $source: getSource(el),
+        $target: getTarget(el),
+        $nexts: resolveElFromAttr(el, "jt-after", true) || [],
+    };
 
-    for (const event of el.getAttribute("jt-event").split(" ")) {
+    appliedCache.set(el, eventMeta);
 
-        if (!event) {
-            continue;
-        }
+    return eventMeta;
+};
 
-        // const separator = (pair + ":").indexOf(":");
-        // const event = pair.slice(0, separator).trim();
-        // const fnName = pair.slice(separator + 1).trim();
 
-        const renderer = getRenderer(el); // @TODO async?
-
+// @TODO: review
+const bindEvents = (el, eventMeta) => {
+    for (const event of eventMeta.$events) {
         if (event === "load") {
-            // handleEvent(el, fnName, renderer);
-            handleEvent(el, handlerName, renderer);
+            handleEvent(el, eventMeta);
             continue;
         }
-
-        el.addEventListener(event, (evt) => handleEvent(el, handlerName, renderer, evt));
+        // console.log(event, eventMeta);
+        el.addEventListener(event, (e) => handleEvent(el, eventMeta, e));
     }
-}
+};
 
 // check if this can be sync and only async if needed
-// should there be a jt-trigger or jt-before, opposite of jt-after
-const handleEvent = async (el, eventVal, renderer, evt) => {
-    if (evt) {
-        evt.preventDefault();
+const handleEvent = async (el, eventMeta, e) => {
+    if (e) {
+        e.preventDefault();
     }
 
-    if (eventVal) {
-        const res = await handlers.access(eventVal, el, evt);
+    if (eventMeta.$handler) {
+        const res = await eventMeta.$handler(el, e);
         if (res === false) {
             return;
         }
     }
 
+    if (eventMeta.$renderer) {
+        const response = await getEventData(el);
+        const dom = eventMeta.$renderer(response);
+        if (dom) {
+            swappers2[eventMeta.$swapper](eventMeta.$target, dom);
+            apply(eventMeta.$target);
+        }
+    }
+
+    if (eventMeta.$isHtml) {
+        const html = await getEventData(el);
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        const scripts = [];
+        const domScripts = doc.body.querySelectorAll("script");
+
+        for (const domScript of domScripts) {
+            scripts.push(domScript.innerHTML);
+            domScript.remove();
+        }
+
+        const frag = document.createDocumentFragment();
+        for (const el of doc.body.children) {
+            frag.appendChild(el);
+        }
+
+        swappers2[eventMeta.$swapper](eventMeta.$target, frag);
+
+        for (const script of scripts) {
+            (new Function(script))();
+        }
+
+        apply(eventMeta.$target);
+    }
+
+    for (const after of eventMeta.$nexts) {
+        run(after);
+    }
+};
+
+const getEventData = async (el) => {
     if (el.tagName === "FORM" || el.tagName === "A") {
         const response = await httpRequest(el);
         if (!response) {
@@ -59,129 +104,20 @@ const handleEvent = async (el, eventVal, renderer, evt) => {
             store.set(storeKey, response);
         }
 
-        actions(el, renderer, response);
-        return;
+        return response;
     }
-
-    let context = {};
 
     const source = el.getAttribute("jt-source");
     if (source) {
-        const sourceObj = store.get(source);
-        if (sourceObj) {
-            context = sourceObj;
-        }
+        return store.get(source);
     }
-
-    actions(el, renderer, context);
-}
-
-const actions = (el, renderer, context) => {
-
-    if (renderer) {
-        renderer(context);
-    }
-
-    const afters = resolveElFromAttr(el, "jt-after", true) ?? [];
-    for (const after of afters) {
-        const afterRenderer = getRenderer(after);
-        handleEvent(after, "", afterRenderer); // @TODO notify proxy/chain/after?
-    }
-}
-
-const getRenderer = (requester) => {
-    const template = getTemplater(requester);
-    if (!template) {
-        return;
-    }
-
-    const target = resolveElFromAttr(requester, "jt-target") || requester;
-    const swapper = getSwapper(requester);
-
-    return (data) => render(requester, template, data, swapper, target);
-}
-
-const getTemplater = (requester) => {
-    if (requester.hasAttribute("jt-html")) {
-        return data => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(data, "text/html");
-
-            const scripts = [];
-            const domScripts = doc.body.querySelectorAll("script");
-
-            for (const domScript of domScripts) {
-                scripts.push(domScript.innerHTML);
-                domScript.remove();
-            }
-
-            const frag = document.createDocumentFragment();
-            for (const el of doc.body.children) {
-                frag.appendChild(el);
-            }
-
-            return { $frag: frag, $scripts: scripts };
-        };
-    }
-
-    const template = resolveElFromAttr(requester, "jt-render");
-    if (!template) {
-        return;
-    }
-
-    if (template._compiled) {
-        return template._compiled;
-    }
-
-    const compiled = compileTemplate(template);
-    template._compiled = compiled;
-
-    return compiled;
-}
-
-const render = (requester, renderer, data, swapper, target) => {
-
-    const dom = renderer(data);
-    if (!dom) {
-        return;
-    }
-
-    if (isDocumentFragment(dom)) {
-        swapper(target, dom);
-        JTML.apply(target);
-        return;
-    }
-
-    swapper(target, dom.$frag);
-
-    for (const script of dom.$scripts) {
-        (new Function(script))();
-    }
-
-    JTML.apply(target);
-}
-
-const getSwapper = (el) => {
-    const swapType = el.getAttribute("jt-swap") || "replace";
-    const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
-
-    if (swapType && !isValidSwapType) {
-        warn(`[jtml] unknown [jt-swap] value ${swapType} on event`, el);
-    }
-
-    const swappers = {
-        replace: (target, dom) => target.replaceChildren(dom),
-        append: (target, dom) => target.appendChild(dom),
-        prepend: (target, dom) => target.prepend(dom),
-    };
-    return swappers[swapType];
-}
+};
 
 const httpRequest = async (requester) => {
     const { $url, $options } = getFetchOptions(requester);
 
     try {
-        runBeforeRequests(requester, $options);
+        hooksRunner(BEFORE_REQUEST, requester, $options);
 
         const beforeHook = requester.getAttribute("jt-request:before");
         if (beforeHook) {
@@ -192,7 +128,7 @@ const httpRequest = async (requester) => {
         const res = await fetch($url, $options);
         const body = await getResponseBody(res);
 
-        runAfterRequests(requester, res, body);
+        hooksRunner(AFTER_REQUEST, requester, res, body);
 
         const afterHook = requester.getAttribute("jt-request:after");
         if (afterHook) {
@@ -208,7 +144,7 @@ const httpRequest = async (requester) => {
 
         return body;
     } catch (err) {
-        runRequestErrors(requester, err);
+        hooksRunner(REQUEST_ERROR, requester, err);
 
         const onError = requester.getAttribute("jt-request:error");
         if (onError) {
@@ -271,6 +207,61 @@ const getResponseBody = (res) => {
     return res.json();
 };
 
+const getRenderer = (el) => {
+    const render = resolveElFromAttr(el, "jt-render");
+    if (!render) {
+        return;
+    }
+
+    return compileTemplate(render);
+};
+
+const getHandler = (el) => {
+    const handlerPath = el.getAttribute("jt-handler");
+    if (!handlerPath) {
+        return;
+    }
+
+    return handlers.get(handlerPath);
+};
+
+const swappers2 = {
+    replace: (target, dom) => target.replaceChildren(dom),
+    append: (target, dom) => target.appendChild(dom),
+    prepend: (target, dom) => target.prepend(dom),
+};
+
+const getSwapper = (el) => {
+    const swapType = el.getAttribute("jt-swap") || "replace";
+    const isValidSwapType = ["replace", "append", "prepend"].includes(swapType);
+
+    if (swapType && !isValidSwapType) {
+        warn(`[jtml] unknown [jt-swap] value ${swapType} on event`, el);
+    }
+
+    return swapType;
+};
+
+const getSource = (el) => {
+    const sourcePath = el.getAttribute("jt-source");
+    if (!sourcePath) {
+        return;
+    }
+
+    return store.get(sourcePath);
+};
+
+const getTarget = (el) => {
+    const target = resolveElFromAttr(el, "jt-target");
+    if (!target) {
+        const tergetSelector = el.getAttribute("jt-target");
+        warn(`[jtml] jt-target ${tergetSelector} not found, defaulting to current jt-event`, el);
+        return el;
+    }
+
+    return target;
+};
+
 const resolveElFromAttr = (el, attr, all = false) => {
     const selector = el.getAttribute(attr);
     if (!selector) {
@@ -288,7 +279,7 @@ const resolveElFromAttr = (el, attr, all = false) => {
 export const apply = (root = document) => {
     debug(root);
 
-    // const start = performance.now();
+    const start = performance.now();
 
     // const xpath = "//*[@*[starts-with(name(), 'jt-on:')]]";
     // const result = document.evaluate(
@@ -309,19 +300,26 @@ export const apply = (root = document) => {
     //     actor._redered = true;
     // }
 
+
     const events = root.querySelectorAll("[jt-event]");
 
     for (const event of events) {
-        if (event._redered) {
+        if (appliedCache.get(event)) {
             continue;
         }
 
-        bindEvents(event);
-        event._redered = true;
+        const eventMeta = parseEventEl(event);
+
+        bindEvents(event, eventMeta);
     }
 
     // const end = performance.now();
-    // console.log(`${end - start} ms`);
+    // if (root === document) {
+    //     console.log(`${end - start} ms`);
+    // }
 };
 
-export const run = (el) => handleEvent(el, "");
+export const run = (el) => {
+    const eventCache = appliedCache.get(el) || parseEventEl(el);
+    handleEvent(el, eventCache);
+};
