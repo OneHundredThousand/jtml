@@ -1,6 +1,6 @@
 {
     "name": "jtml",
-    "version": "0.4.7",
+    "version": "0.4.8",
     "description": "**jtml** is a lightweight JavaScript micro-library inspired by [HTMX](https://htmx.org), but built for the JSON age. It brings HTML templating back to the front of frontend development—where it belongs.",
     "main": "template.js",
     "directories": {
