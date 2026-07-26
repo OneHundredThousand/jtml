@@ -1,23 +1,24 @@
 import { getNestedValue, isHTMLTemplateElement } from "./utils";
 import { error, warn } from "./debugger/utils";
 
-const AST_TYPE = {
-    Element: 1,
-    Text: 2,
-    If: 3,
-    Loop: 4,
-};
+const JT_FOREACH = "jt-foreach";
+const JT_IF = "jt-if";
+const JT_ELSE_IF = "jt-elseif";
+const JT_ELSE = "jt-else";
+const JT_ATTR = "jt-attr:";
+const JT_TEXT = "jt-text";
 
-const IF_TYPE = {
-    If: 1,
-    ElseIf: 2,
-    Else: 3
-};
+const AST_Element = 1;
+const AST_Text = 2;
+const AST_If = 3;
+const AST_Loop = 4;
 
-const INTERPOLATION_NODE_TYPE = {
-    Static: 1,
-    Expr: 2,
-};
+const IF_TYPE_IF = 1;
+const IF_TYPE_ELSEIF = 2;
+const IF_TYPE_ELSE = 3;
+
+const INTERPOLATION_STATIC = 1;
+const INTERPOLATION_EXPR = 1;
 
 const TEXT_NODE = Node.TEXT_NODE;
 const ELEMENT_NODE = Node.ELEMENT_NODE;
@@ -53,22 +54,22 @@ const createRenderers = (elems) => {
             continue;
         }
 
-        if (el.hasAttribute("jt-foreach")) {
+        if (el.hasAttribute(JT_FOREACH)) {
             nodes.push(toForeach(el));
             continue;
         }
 
-        if (el.hasAttribute("jt-if")) {
+        if (el.hasAttribute(JT_IF)) {
             const chain = readConditionalChain(elems, i);
             nodes.push(toIf(chain));
             i = chain.$nextIndex - 1;
             continue;
         }
 
-        if (el.hasAttribute("jt-elseif") || el.hasAttribute("jt-else")) {
-            const found = el.hasAttribute("jt-elseif") ? "jt-elseif" : "jt-else";
-            const value = el.hasAttribute("jt-elseif") ? el.getAttribute("jt-elseif") : "";
-            warn(`[jtml] ${found}="${value}" with no preceding "jt-if"`, elems[i]);
+        if (el.hasAttribute(JT_ELSE_IF) || el.hasAttribute(JT_ELSE)) {
+            const found = el.hasAttribute(JT_ELSE_IF) ? JT_ELSE_IF : JT_ELSE;
+            const value = el.hasAttribute(JT_ELSE_IF) ? el.getAttribute(JT_ELSE_IF) : "";
+            warn(`[jtml] ${found}="${value}" with no preceding "${JT_IF}"`, elems[i]);
         }
 
         nodes.push(toElement(el));
@@ -77,7 +78,7 @@ const createRenderers = (elems) => {
 }
 
 const readConditionalChain = (children, start) => {
-    const branches = [toBranch(children[start], IF_TYPE.If)];
+    const branches = [toBranch(children[start], IF_TYPE_IF)];
     let i = start + 1;
     let sawElse = false;
 
@@ -89,18 +90,18 @@ const readConditionalChain = (children, start) => {
             continue;
         }
 
-        if (el.hasAttribute("jt-elseif")) {
+        if (el.hasAttribute(JT_ELSE_IF)) {
             if (sawElse) {
                 warn(`[jtml] "elseif" cannot follow "else"`, children[i]);
                 continue;
             }
-            branches.push(toBranch(children[i], IF_TYPE.ElseIf));
-        } else if (el.hasAttribute("jt-else")) {
+            branches.push(toBranch(children[i], IF_TYPE_ELSEIF));
+        } else if (el.hasAttribute(JT_ELSE)) {
             if (sawElse) {
                 warn(`[jtml] Only one "else" allowed per chain`, children[i]);
                 continue;
             }
-            branches.push(toBranch(children[i], IF_TYPE.Else));
+            branches.push(toBranch(children[i], IF_TYPE_ELSE));
             sawElse = true;
         } else {
             break;
@@ -112,11 +113,11 @@ const readConditionalChain = (children, start) => {
 };
 
 const toElement = (el) => {
-    const text = el.getAttribute("jt-text");
+    const text = el.getAttribute(JT_TEXT);
     const textInterpolation = text && compileInterpolations(text);
     const compiledBinders = compileBinders(el);
     return {
-        $type: AST_TYPE.Element,
+        $type: AST_Element,
         $element: el,
         $textContent: textInterpolation,
         $binders: compiledBinders,
@@ -124,26 +125,22 @@ const toElement = (el) => {
     };
 };
 
-const toText = (el) => {
-    return {
-        $type: AST_TYPE.Text,
-        $textContent: el.textContent,
-    };
-};
+const toText = (el) => ({
+    $type: AST_Text,
+    $textContent: el.textContent,
+});
 
-const toIf = (chain) => {
-    return {
-        $type: AST_TYPE.If,
-        $branches: chain.$branches,
-    };
-};
+const toIf = (chain) => ({
+    $type: AST_If,
+    $branches: chain.$branches,
+});
 
 const toBranch = (node, type) => {
     let condition;
-    if (type === IF_TYPE.If) {
-        condition = compileIf(node, "jt-if");
-    } else if (type === IF_TYPE.ElseIf) {
-        condition = compileIf(node, "jt-elseif");
+    if (type === IF_TYPE_IF) {
+        condition = compileIf(node, JT_IF);
+    } else if (type === IF_TYPE_ELSEIF) {
+        condition = compileIf(node, JT_ELSE_IF);
     } else {
         condition = () => true;
     }
@@ -156,15 +153,19 @@ const toBranch = (node, type) => {
 };
 
 const toForeach = (node) => {
-    const foreach = node.getAttribute("jt-foreach");
+    const foreach = node.getAttribute(JT_FOREACH);
     if (!foreach) {
         return foreach;
     }
 
-    // @TODO: add validation
-    const [collection, , alias] = foreach.trim().split(" ").filter(Boolean);
+    const [collection, as, alias] = foreach.trim().split(" ").filter(Boolean);
+
+    if (!collection || !as || as !== "as" || !alias) {
+        warn(`[jtml] invalid jt-foreach synatx "${foreach}"`, node);
+    }
+
     return {
-        $type: AST_TYPE.Loop,
+        $type: AST_Loop,
         $collection: collection,
         $alias: alias,
         $template: toElement(node),
@@ -176,7 +177,7 @@ const compileBinders = (node) => {
     const binders = [];
 
     for (const attr of node.attributes) {
-        if (attr.name.startsWith("jt-attr:")) {
+        if (attr.name.startsWith(JT_ATTR)) {
             if (!attr.value) {
                 continue;
             }
@@ -196,12 +197,13 @@ const compileBinders = (node) => {
 const compileIf = (node, attr) => {
     const xif = node.getAttribute(attr);
     if (!xif) {
+        warn(`[jtml] empty ${attr} expression`, node);
         return () => false;
     }
 
     const ops = {
         eq: (a, b) => a === b,
-        neq: (a, b) => a !== b,
+        ne: (a, b) => a !== b,
         gt: (a, b) => a > b,
         lt: (a, b) => a < b,
         gte: (a, b) => a >= b,
@@ -210,12 +212,11 @@ const compileIf = (node, attr) => {
 
     const parts = xif.trim().split(" ").filter(Boolean);
     if (parts.length === 1) {
-        let [path] = parts;
+        const [path] = parts;
         if (path[0] === "!") {
-            path = path.slice(1);
-            return (ctx) => !ctx[path];
+            return (ctx) => !getNestedValue(ctx, path.slice(1));
         }
-        return (ctx) => ctx[path];
+        return (ctx) => getNestedValue(ctx, path);
     }
 
     const [left, op, right] = parts;
@@ -231,7 +232,7 @@ const compileIf = (node, attr) => {
             return () => val.slice(1, -1);
         }
 
-        if (!isNaN(Number(val))) {
+        if (!isNaN(val)) {
             return () => Number(val);
         }
 
@@ -268,7 +269,7 @@ const compileInterpolations = (str) => {
 
     const flushStatic = (end) => {
         if (end > staticStart) {
-            parts.push({ $type: INTERPOLATION_NODE_TYPE.Static, $value: str.slice(staticStart, end) });
+            parts.push({ $type: INTERPOLATION_STATIC, $value: str.slice(staticStart, end) });
         }
     };
 
@@ -279,7 +280,7 @@ const compileInterpolations = (str) => {
             // Escaped brace: flush static up to here, splice in literal char,
             // then restart static run right after it.
             flushStatic(i);
-            parts.push({ $type: INTERPOLATION_NODE_TYPE.Static, $value: str[i + 1] });
+            parts.push({ $type: INTERPOLATION_STATIC, $value: str[i + 1] });
             i += 2;
             staticStart = i;
             continue;
@@ -301,7 +302,7 @@ const compileInterpolations = (str) => {
                 return;
             }
 
-            parts.push({ $type: INTERPOLATION_NODE_TYPE.Expr, $expr: expr });
+            parts.push({ $type: INTERPOLATION_EXPR, $expr: expr });
             i = close + 1;
             staticStart = i;
             continue;
@@ -322,14 +323,14 @@ const compileInterpolations = (str) => {
     return (ctx) => {
         let out = "";
 
-        if (parts.length === 1 && parts[0].$type === INTERPOLATION_NODE_TYPE.Static) {
+        if (parts.length === 1 && parts[0].$type === INTERPOLATION_STATIC) {
             const val = getNestedValue(ctx, parts[0].$value);
             out += val ? String(val) : parts[0].$value;
             return out;
         }
 
         for (const part of parts) {
-            out += part.$type === INTERPOLATION_NODE_TYPE.Static
+            out += part.$type === INTERPOLATION_STATIC
                 ? part.$value
                 : String(getNestedValue(ctx, part.$expr));
         }
@@ -340,12 +341,12 @@ const compileInterpolations = (str) => {
 const renderNode = (renderer, context, isDynamic) => {
     const { $type } = renderer;
 
-    if ($type === AST_TYPE.Text && isDynamic) {
+    if ($type === AST_Text && isDynamic) {
         const { $textContent } = renderer;
         return document.createTextNode($textContent);
     }
 
-    if ($type === AST_TYPE.If) {
+    if ($type === AST_If) {
         const { $branches } = renderer;
         for (const branch of $branches) {
             if (branch.$condition(context)) {
@@ -355,7 +356,7 @@ const renderNode = (renderer, context, isDynamic) => {
         return;
     }
 
-    if ($type === AST_TYPE.Loop) {
+    if ($type === AST_Loop) {
         const { $collection, $alias, $template } = renderer;
 
         const items = getNestedValue(context, $collection);
@@ -383,7 +384,7 @@ const renderNode = (renderer, context, isDynamic) => {
         return frag;
     }
 
-    if ($type === AST_TYPE.Element) {
+    if ($type === AST_Element) {
         const { $element, $textContent, $binders, $children } = renderer;
 
         const clone = isDynamic ? $element.cloneNode(false) : $element;

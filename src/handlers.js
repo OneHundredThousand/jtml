@@ -21,7 +21,7 @@ export const handlers = {
 
         return () => delete storedHandlers[constructor];
     },
-    access: async (path, ...params) => {
+    get: (path) => {
         if (!isString(path)) {
             warn(`handlers: access() path "${path}" must be a string, ${typeof path} received.`);
             return;
@@ -31,37 +31,15 @@ export const handlers = {
 
         const handler = storedHandlers[constructor];
         if (!handler) {
-            warn(`handlers: access() handler "${handler}" was not found, full path ${path}`);
+            warn(`handlers: access() handler "${handler}" was not found, full path "${path}"`);
             return;
         }
 
         if (!isFunction(handler[method])) {
-            warn(`handlers: access() the value for method found was not a function but a "${typeof handler[method]}", full path ${path}`);
+            warn(`handlers: access() the value for method found was not a function but a "${typeof handler[method]}", full path "${path}"`);
             return;
         }
 
-        return handler[method](...params);
-    }
-}
-
-export const getHandler = (path) => {
-    if (!isString(path)) {
-        return;
-    }
-
-    const [constructor, method = ""] = path.split(".");
-
-    const handler = storedHandlers[constructor];
-    if (!handler) {
-        return;
-    }
-
-    if (!isFunction(handler[method])) {
-        return;
-    }
-
-    return {
-        constructor,
-        handler: handler[method],
-    };
+        return handler[method];
+    },
 }
