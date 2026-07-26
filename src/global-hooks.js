@@ -1,9 +1,9 @@
 import { isFunction } from "./utils";
 import { warn, stringify } from "./debugger/utils";
 
-const BEFORE_REQUEST = "beforeRequest";
-const AFTER_REQUEST = "afterRequest";
-const REQUEST_ERROR = "requestError";
+export const BEFORE_REQUEST = "beforeRequest";
+export const AFTER_REQUEST = "afterRequest";
+export const REQUEST_ERROR = "requestError";
 
 const hooks = {
     [BEFORE_REQUEST]: [],
@@ -55,20 +55,20 @@ export const globalHooks = {
 //     // }
 // }
 
-export const runBeforeRequests = (...params) => {
-    for (const hook of hooks[BEFORE_REQUEST]) {
-        hook(...params);
-    }
-};
+// export const runBeforeRequests = (...params) => {
+//     for (const hook of hooks[BEFORE_REQUEST]) {
+//         hook(...params);
+//     }
+// };
 
-export const runAfterRequests = (...params) => {
-    for (const hook of hooks[AFTER_REQUEST]) {
-        hook(...params);
-    }
-};
+// export const runAfterRequests = (...params) => {
+//     for (const hook of hooks[AFTER_REQUEST]) {
+//         hook(...params);
+//     }
+// };
 
-export const runRequestErrors = (...params) => {
-    for (const hook of hooks[REQUEST_ERROR]) {
+export const run = (phase, ...params) => {
+    for (const hook of hooks[phase]) {
         hook(...params);
     }
 };

@@ -1,5 +1,5 @@
-import { getHandler } from "../handlers";
-import { getStore } from "../store";
+import { handlers } from "../handlers";
+import { store } from "../store";
 import { warn } from "./utils";
 
 const __DEV__ = process.env.NODE_ENV !== "production";
@@ -25,26 +25,38 @@ export function debug(root) {
             "jt-swap": (event) => event.getAttribute("jt-swap") || "replace",
             "jt-after": (event) => resolveElFromAttr(event, "jt-after", true),
 
-            "jt-source": (event) => ({
-                name: event.getAttribute("jt-source"),
-                store: getStore(event.getAttribute("jt-source")),
-            }),
+            "jt-source": (event) => {
+                const sourceName = event.getAttribute("jt-source");
+                return {
+                    name: sourceName,
+                    source: sourceName ? store.get(sourceName) : null,
+                };
+            },
 
-            "jt-request:before": (event) => ({
-                name: event.getAttribute("jt-request:before"),
-                class: getHandler(event.getAttribute("jt-request:before"))?.constructor,
-                handler: getHandler(event.getAttribute("jt-request:before"))?.handler,
-            }),
-            "jt-request:after": (event) => ({
-                name: event.getAttribute("jt-request:after"),
-                class: getHandler(event.getAttribute("jt-request:after"))?.constructor,
-                handler: getHandler(event.getAttribute("jt-request:after"))?.handler,
-            }),
-            "jt-request:error": (event) => ({
-                name: event.getAttribute("jt-request:error"),
-                class: getHandler(event.getAttribute("jt-request:error"))?.constructor,
-                handler: getHandler(event.getAttribute("jt-request:error"))?.handler,
-            }),
+            "jt-request:before": (event) => {
+                const beforeRequestName = event.getAttribute("jt-request:before");
+                return {
+                    name: beforeRequestName,
+                    class: beforeRequestName?.split(".")?.at(0),
+                    handler: beforeRequestName ? handlers.get(beforeRequestName)?.handler : null,
+                };
+            },
+            "jt-request:after": (event) => {
+                const afterRequestName = event.getAttribute("jt-request:after");
+                return {
+                    name: afterRequestName,
+                    class: afterRequestName?.split(".")?.at(0),
+                    handler: afterRequestName ? handlers.get(afterRequestName)?.handler : null,
+                };
+            },
+            "jt-request:error": (event) => {
+                const requestErrorName = event.getAttribute("jt-request:error");
+                return {
+                    name: requestErrorName,
+                    class: requestErrorName?.split(".")?.at(0),
+                    handler: requestErrorName ? handlers.get(requestErrorName)?.handler : null,
+                }
+            },
         };
 
         for (const event of events) {
