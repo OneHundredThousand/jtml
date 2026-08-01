@@ -40,6 +40,6 @@ export const handlers = {
             return;
         }
 
-        return handler[method];
+        return handler[method].bind(handler);
     },
 }
