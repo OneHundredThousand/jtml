@@ -40,7 +40,8 @@ const bindEvents = (el, eventMeta) => {
 
 // check if this can be sync and only async if needed
 const handleEvent = async (el, eventMeta, e) => {
-    if (e) {
+    const isFormOrLink = el.tagName === "A" || el.tagName === "FORM";
+    if (isFormOrLink && e) {
         e.preventDefault();
     }
 
